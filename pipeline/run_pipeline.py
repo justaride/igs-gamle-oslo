@@ -6,6 +6,8 @@ Fetches OSM data, detects IGS candidates, loads into PostGIS.
 import sys
 import argparse
 
+sys.stdout.reconfigure(line_buffering=True)
+
 def main():
     parser = argparse.ArgumentParser(description='IGS detection pipeline')
     parser.add_argument('--skip-elevation', action='store_true',
@@ -63,8 +65,9 @@ def main():
         from fetch_species import fetch_species_for_sites
 
         from sqlalchemy import create_engine, text
-        from config import DATABASE_URL
-        engine = create_engine(DATABASE_URL)
+        from config import DATABASE_URL as DEFAULT_DB_URL
+        import os
+        engine = create_engine(os.environ.get('DATABASE_URL', DEFAULT_DB_URL))
         with engine.connect() as conn:
             result = conn.execute(text(
                 'SELECT id, ST_AsText(geom) as wkt FROM sites'

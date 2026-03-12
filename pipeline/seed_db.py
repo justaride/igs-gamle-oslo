@@ -1,8 +1,11 @@
 import geopandas as gpd
 from shapely.geometry import MultiPolygon, mapping
 from sqlalchemy import create_engine, text
-from config import DATABASE_URL, CRS_WGS84, CRS_UTM
+from config import DATABASE_URL as DEFAULT_DB_URL, CRS_WGS84, CRS_UTM
 import json
+import os
+
+DATABASE_URL = os.environ.get('DATABASE_URL', DEFAULT_DB_URL)
 
 def ensure_multi(geom):
     if geom.geom_type == 'Polygon':
