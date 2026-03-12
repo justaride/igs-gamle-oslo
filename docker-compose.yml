@@ -4,9 +4,7 @@ services:
     environment:
       POSTGRES_DB: igs
       POSTGRES_USER: igs
-      POSTGRES_PASSWORD: igs_dev_2024
-    ports:
-      - '5432:5432'
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-igs_dev_2024}
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./server/migrations:/docker-entrypoint-initdb.d
@@ -21,10 +19,8 @@ services:
       context: .
       dockerfile: Dockerfile
       target: server
-    ports:
-      - '3001:3001'
     environment:
-      DATABASE_URL: postgresql://igs:igs_dev_2024@db:5432/igs
+      DATABASE_URL: postgresql://igs:${DB_PASSWORD:-igs_dev_2024}@db:5432/igs
       PORT: '3001'
     depends_on:
       db:
@@ -36,7 +32,7 @@ services:
       dockerfile: Dockerfile
       target: client
     ports:
-      - '5173:80'
+      - '80:80'
     depends_on:
       - server
 
