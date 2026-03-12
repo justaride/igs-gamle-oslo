@@ -1,0 +1,44 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: igs
+      POSTGRES_USER: igs
+      POSTGRES_PASSWORD: igs_dev_2024
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./server/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U igs']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: server
+    ports:
+      - '3001:3001'
+    environment:
+      DATABASE_URL: postgresql://igs:igs_dev_2024@db:5432/igs
+      PORT: '3001'
+    depends_on:
+      db:
+        condition: service_healthy
+
+  client:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: client
+    ports:
+      - '5173:80'
+    depends_on:
+      - server
+
+volumes:
+  pgdata:
