@@ -1,4 +1,4 @@
-import { query } from '../db.js'
+import pool, { query } from '../db.js'
 
 const REVIEW_QUEUE_LAYER_KEYS = [
   'steep_slopes',
@@ -35,6 +35,203 @@ const GEOJSON_SELECT = `
     )
   )
 `
+
+const REVIEW_QUEUE_COMPUTE_SQL = `
+  WITH layer_matrix AS (
+    SELECT
+      ST_UnaryUnion(
+        ST_Collect(ST_SetSRID(ST_GeomFromGeoJSON((feature->'geometry')::text), 4326))
+          FILTER (WHERE cl.layer_key = 'steep_slopes')
+      ) AS steep_geom,
+      ST_UnaryUnion(
+        ST_Collect(ST_SetSRID(ST_GeomFromGeoJSON((feature->'geometry')::text), 4326))
+          FILTER (WHERE cl.layer_key = 'edgeland_geo_edges')
+      ) AS geo_geom,
+      ST_UnaryUnion(
+        ST_Collect(ST_SetSRID(ST_GeomFromGeoJSON((feature->'geometry')::text), 4326))
+          FILTER (WHERE cl.layer_key = 'residual_infra_buffers')
+      ) AS residual_geom
+    FROM context_layers cl
+    LEFT JOIN LATERAL jsonb_array_elements(COALESCE(cl.geojson->'features', '[]'::jsonb)) AS f(feature) ON true
+    WHERE cl.layer_key = ANY($1::text[])
+  ),
+  site_signals AS (
+    SELECT
+      s.id AS site_id,
+      s.site_number,
+      s.igs_type,
+      s.subtype,
+      s.status,
+      s.area_m2,
+      s.good_opportunity,
+      s.hidden_gem,
+      s.dangerous,
+      s.noisy,
+      s.too_small,
+      CASE
+        WHEN lm.steep_geom IS NOT NULL AND ST_Intersects(s.geom, lm.steep_geom)
+          THEN ST_Area(ST_Transform(ST_Intersection(s.geom, lm.steep_geom), 25833))
+        ELSE 0
+      END AS steep_overlap_m2,
+      CASE
+        WHEN lm.geo_geom IS NOT NULL AND ST_Intersects(s.geom, lm.geo_geom)
+          THEN ST_Area(ST_Transform(ST_Intersection(s.geom, lm.geo_geom), 25833))
+        ELSE 0
+      END AS geo_overlap_m2,
+      CASE
+        WHEN lm.residual_geom IS NOT NULL AND ST_Intersects(s.geom, lm.residual_geom)
+          THEN ST_Area(ST_Transform(ST_Intersection(s.geom, lm.residual_geom), 25833))
+        ELSE 0
+      END AS residual_overlap_m2,
+      0::float8 AS road_overlap_m2
+    FROM sites s
+    CROSS JOIN layer_matrix lm
+    WHERE ($2::int[] IS NULL OR s.id = ANY($2::int[]))
+  ),
+  ranked AS (
+    SELECT
+      ss.*,
+      (
+        CASE WHEN ss.steep_overlap_m2 > 0 THEN 3 ELSE 0 END +
+        CASE WHEN ss.geo_overlap_m2 > 0 THEN 3 ELSE 0 END +
+        CASE WHEN ss.residual_overlap_m2 > 0 THEN 2 ELSE 0 END +
+        CASE WHEN ss.dangerous THEN 2 ELSE 0 END +
+        CASE WHEN ss.noisy THEN 1 ELSE 0 END +
+        CASE WHEN ss.too_small THEN 1 ELSE 0 END
+      ) AS score,
+      (
+        CASE WHEN ss.steep_overlap_m2 > 0 THEN 1 ELSE 0 END +
+        CASE WHEN ss.geo_overlap_m2 > 0 THEN 1 ELSE 0 END +
+        CASE WHEN ss.residual_overlap_m2 > 0 THEN 1 ELSE 0 END +
+        CASE WHEN ss.dangerous THEN 1 ELSE 0 END +
+        CASE WHEN ss.noisy THEN 1 ELSE 0 END +
+        CASE WHEN ss.too_small THEN 1 ELSE 0 END
+      ) AS signal_count,
+      GREATEST(
+        COALESCE(ss.steep_overlap_m2 / NULLIF(ss.area_m2, 0), 0),
+        COALESCE(ss.geo_overlap_m2 / NULLIF(ss.area_m2, 0), 0),
+        COALESCE(ss.residual_overlap_m2 / NULLIF(ss.area_m2, 0), 0)
+      ) AS max_overlap_ratio
+    FROM site_signals ss
+  )
+  SELECT
+    site_id AS "siteId",
+    site_number AS "siteNumber",
+    igs_type AS "igsType",
+    subtype,
+    status,
+    area_m2 AS "areaM2",
+    good_opportunity AS "goodOpportunity",
+    hidden_gem AS "hiddenGem",
+    dangerous,
+    noisy,
+    too_small AS "tooSmall",
+    score,
+    signal_count AS "signalCount",
+    ROUND(max_overlap_ratio::numeric, 4)::float8 AS "maxOverlapRatio",
+    json_build_object(
+      'steepSlopesM2', ROUND(steep_overlap_m2::numeric, 1)::float8,
+      'geoEdgesM2', ROUND(geo_overlap_m2::numeric, 1)::float8,
+      'residualBuffersM2', ROUND(residual_overlap_m2::numeric, 1)::float8,
+      'roadMaskM2', ROUND(road_overlap_m2::numeric, 1)::float8
+    ) AS overlaps,
+    ARRAY_REMOVE(ARRAY[
+      CASE WHEN steep_overlap_m2 > 0 THEN 'Bratt terreng' END,
+      CASE WHEN geo_overlap_m2 > 0 THEN 'Geo-edgeland' END,
+      CASE WHEN residual_overlap_m2 > 0 THEN 'Residual infrastruktur' END,
+      CASE WHEN dangerous THEN 'Farlig' END,
+      CASE WHEN noisy THEN 'Støy' END,
+      CASE WHEN too_small THEN 'For lite' END
+    ], NULL) AS reasons
+  FROM ranked
+  WHERE score > 0
+  ORDER BY score DESC, signal_count DESC, max_overlap_ratio DESC, area_m2 DESC NULLS LAST, site_number ASC
+`
+
+async function computeReviewQueueRows(siteIds?: number[]) {
+  const result = await query(REVIEW_QUEUE_COMPUTE_SQL, [
+    [...REVIEW_QUEUE_LAYER_KEYS],
+    siteIds && siteIds.length > 0 ? siteIds : null,
+  ])
+
+  return result.rows
+}
+
+export async function refreshReviewQueueCache(siteIds?: number[]) {
+  const rows = await computeReviewQueueRows(siteIds)
+  const client = await pool.connect()
+
+  try {
+    await client.query('BEGIN')
+
+    if (siteIds && siteIds.length > 0) {
+      await client.query('DELETE FROM review_queue_cache WHERE site_id = ANY($1::int[])', [siteIds])
+    } else {
+      await client.query('TRUNCATE review_queue_cache')
+    }
+
+    for (const row of rows) {
+      await client.query(
+        `
+          INSERT INTO review_queue_cache (
+            site_id,
+            site_number,
+            igs_type,
+            subtype,
+            status,
+            area_m2,
+            good_opportunity,
+            hidden_gem,
+            dangerous,
+            noisy,
+            too_small,
+            score,
+            signal_count,
+            max_overlap_ratio,
+            overlaps,
+            reasons,
+            updated_at
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15::jsonb, $16::text[], NOW()
+          )
+        `,
+        [
+          row.siteId,
+          row.siteNumber,
+          row.igsType,
+          row.subtype,
+          row.status,
+          row.areaM2,
+          row.goodOpportunity,
+          row.hiddenGem,
+          row.dangerous,
+          row.noisy,
+          row.tooSmall,
+          row.score,
+          row.signalCount,
+          row.maxOverlapRatio,
+          JSON.stringify(row.overlaps),
+          row.reasons,
+        ]
+      )
+    }
+
+    await client.query('COMMIT')
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+async function refreshReviewQueueCacheForSite(id: number) {
+  try {
+    await refreshReviewQueueCache([id])
+  } catch (error) {
+    console.error('Failed to refresh review queue cache for site', id, error)
+  }
+}
 
 export async function getAllSites() {
   const result = await query(`
@@ -83,6 +280,11 @@ export async function updateSite(id: number, fields: Record<string, unknown>) {
     `UPDATE sites SET ${updates.join(', ')} WHERE id = $${idx} RETURNING id`,
     values
   )
+
+  if (result.rows[0]) {
+    await refreshReviewQueueCacheForSite(id)
+  }
+
   return result.rows[0]
 }
 
@@ -94,6 +296,11 @@ export async function updateSiteGeometry(id: number, geojson: object) {
      WHERE id = $2 RETURNING id`,
     [JSON.stringify(geojson), id]
   )
+
+  if (result.rows[0]) {
+    await refreshReviewQueueCacheForSite(id)
+  }
+
   return result.rows[0]
 }
 
@@ -102,6 +309,11 @@ export async function updateSiteStatus(id: number, status: string) {
     `UPDATE sites SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING id`,
     [status, id]
   )
+
+  if (result.rows[0]) {
+    await refreshReviewQueueCacheForSite(id)
+  }
+
   return result.rows[0]
 }
 
@@ -110,87 +322,8 @@ export async function getReviewQueue(limit = 200) {
 
   const result = await query(
     `
-      WITH layer_matrix AS (
-        SELECT
-          ST_UnaryUnion(
-            ST_Collect(ST_SetSRID(ST_GeomFromGeoJSON((feature->'geometry')::text), 4326))
-              FILTER (WHERE cl.layer_key = 'steep_slopes')
-          ) AS steep_geom,
-          ST_UnaryUnion(
-            ST_Collect(ST_SetSRID(ST_GeomFromGeoJSON((feature->'geometry')::text), 4326))
-              FILTER (WHERE cl.layer_key = 'edgeland_geo_edges')
-          ) AS geo_geom,
-          ST_UnaryUnion(
-            ST_Collect(ST_SetSRID(ST_GeomFromGeoJSON((feature->'geometry')::text), 4326))
-              FILTER (WHERE cl.layer_key = 'residual_infra_buffers')
-          ) AS residual_geom
-        FROM context_layers cl
-        LEFT JOIN LATERAL jsonb_array_elements(COALESCE(cl.geojson->'features', '[]'::jsonb)) AS f(feature) ON true
-        WHERE cl.layer_key = ANY($1::text[])
-      ),
-      site_signals AS (
-        SELECT
-          s.id,
-          s.site_number,
-          s.igs_type,
-          s.subtype,
-          s.status,
-          s.area_m2,
-          s.good_opportunity,
-          s.hidden_gem,
-          s.dangerous,
-          s.noisy,
-          s.too_small,
-          CASE
-            WHEN lm.steep_geom IS NOT NULL AND ST_Intersects(s.geom, lm.steep_geom)
-              THEN ST_Area(ST_Transform(ST_Intersection(s.geom, lm.steep_geom), 25833))
-            ELSE 0
-          END AS steep_overlap_m2,
-          CASE
-            WHEN lm.geo_geom IS NOT NULL AND ST_Intersects(s.geom, lm.geo_geom)
-              THEN ST_Area(ST_Transform(ST_Intersection(s.geom, lm.geo_geom), 25833))
-            ELSE 0
-          END AS geo_overlap_m2,
-          CASE
-            WHEN lm.residual_geom IS NOT NULL AND ST_Intersects(s.geom, lm.residual_geom)
-              THEN ST_Area(ST_Transform(ST_Intersection(s.geom, lm.residual_geom), 25833))
-            ELSE 0
-          END AS residual_overlap_m2,
-          0::float8 AS road_overlap_m2
-        FROM sites s
-        CROSS JOIN layer_matrix lm
-      ),
-      ranked AS (
-        SELECT
-          ss.*,
-          (
-            CASE WHEN ss.steep_overlap_m2 > 0 THEN 3 ELSE 0 END +
-            CASE WHEN ss.geo_overlap_m2 > 0 THEN 3 ELSE 0 END +
-            CASE WHEN ss.residual_overlap_m2 > 0 THEN 2 ELSE 0 END +
-            CASE WHEN ss.road_overlap_m2 > 0 THEN 1 ELSE 0 END +
-            CASE WHEN ss.dangerous THEN 2 ELSE 0 END +
-            CASE WHEN ss.noisy THEN 1 ELSE 0 END +
-            CASE WHEN ss.too_small THEN 1 ELSE 0 END
-          ) AS score,
-          (
-            CASE WHEN ss.steep_overlap_m2 > 0 THEN 1 ELSE 0 END +
-            CASE WHEN ss.geo_overlap_m2 > 0 THEN 1 ELSE 0 END +
-            CASE WHEN ss.residual_overlap_m2 > 0 THEN 1 ELSE 0 END +
-            CASE WHEN ss.road_overlap_m2 > 0 THEN 1 ELSE 0 END +
-            CASE WHEN ss.dangerous THEN 1 ELSE 0 END +
-            CASE WHEN ss.noisy THEN 1 ELSE 0 END +
-            CASE WHEN ss.too_small THEN 1 ELSE 0 END
-          ) AS signal_count,
-          GREATEST(
-            COALESCE(ss.steep_overlap_m2 / NULLIF(ss.area_m2, 0), 0),
-            COALESCE(ss.geo_overlap_m2 / NULLIF(ss.area_m2, 0), 0),
-            COALESCE(ss.residual_overlap_m2 / NULLIF(ss.area_m2, 0), 0),
-            COALESCE(ss.road_overlap_m2 / NULLIF(ss.area_m2, 0), 0)
-          ) AS max_overlap_ratio
-        FROM site_signals ss
-      )
       SELECT
-        id,
+        site_id AS id,
         site_number AS "siteNumber",
         igs_type AS "igsType",
         subtype,
@@ -203,28 +336,14 @@ export async function getReviewQueue(limit = 200) {
         too_small AS "tooSmall",
         score,
         signal_count AS "signalCount",
-        ROUND(max_overlap_ratio::numeric, 4)::float8 AS "maxOverlapRatio",
-        json_build_object(
-          'steepSlopesM2', ROUND(steep_overlap_m2::numeric, 1)::float8,
-          'geoEdgesM2', ROUND(geo_overlap_m2::numeric, 1)::float8,
-          'residualBuffersM2', ROUND(residual_overlap_m2::numeric, 1)::float8,
-          'roadMaskM2', ROUND(road_overlap_m2::numeric, 1)::float8
-        ) AS overlaps,
-        ARRAY_REMOVE(ARRAY[
-          CASE WHEN steep_overlap_m2 > 0 THEN 'Bratt terreng' END,
-          CASE WHEN geo_overlap_m2 > 0 THEN 'Geo-edgeland' END,
-          CASE WHEN residual_overlap_m2 > 0 THEN 'Residual infrastruktur' END,
-          CASE WHEN road_overlap_m2 > 0 THEN 'Veibane' END,
-          CASE WHEN dangerous THEN 'Farlig' END,
-          CASE WHEN noisy THEN 'Støy' END,
-          CASE WHEN too_small THEN 'For lite' END
-        ], NULL) AS reasons
-      FROM ranked
-      WHERE score > 0
+        max_overlap_ratio AS "maxOverlapRatio",
+        overlaps,
+        reasons
+      FROM review_queue_cache
       ORDER BY score DESC, signal_count DESC, max_overlap_ratio DESC, area_m2 DESC NULLS LAST, site_number ASC
-      LIMIT $2
+      LIMIT $1
     `,
-    [[...REVIEW_QUEUE_LAYER_KEYS], safeLimit]
+    [safeLimit]
   )
 
   return result.rows
