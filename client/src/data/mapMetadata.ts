@@ -95,6 +95,24 @@ export const OVERVIEW_ELEMENT_DETAILS: MapElementDetail[] = [
     description: 'Observasjoner av fremmede arter som kan påvirke stedets økologiske kvalitet.',
     dot: true,
   },
+  {
+    id: 'steep_slopes',
+    label: 'Bratte skråninger',
+    color: '#e74c3c',
+    description: 'QA-lag som markerer terreng med bratt helning, brukes i revisjonskøen for å flagge steder med krevende topografi.',
+  },
+  {
+    id: 'edgeland_geo_edges',
+    label: 'Geo-edgeland',
+    color: '#3498db',
+    description: 'QA-lag som markerer geologiske kantområder der ulike flater møtes, brukes for å prioritere steder som trenger nærmere vurdering.',
+  },
+  {
+    id: 'residual_infra_buffers',
+    label: 'Residual infrastruktur',
+    color: '#9b59b6',
+    description: 'QA-lag med buffersoner rundt infrastruktur, brukes for å identifisere steder der polygon kan overlappe med veier eller anlegg.',
+  },
 ]
 
 export const LEGEND_ITEMS: MapElementDetail[] = [

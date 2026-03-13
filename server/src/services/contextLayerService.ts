@@ -1,4 +1,11 @@
 import { query } from '../db.js'
+import { refreshReviewQueueCache } from './siteService.js'
+
+const REVIEW_QUEUE_LAYER_KEYS = [
+  'steep_slopes',
+  'edgeland_geo_edges',
+  'residual_infra_buffers',
+]
 
 type ContextLayerRow = {
   layer_key: string
@@ -35,6 +42,42 @@ export async function getContextLayers(keys?: string[]) {
     featureCount: row.feature_count,
     geojson: row.geojson,
   }))
+}
+
+async function refreshQueueIfNeeded(updatedKeys: string[]) {
+  const affectsQueue = updatedKeys.some((k) => REVIEW_QUEUE_LAYER_KEYS.includes(k))
+  if (affectsQueue) {
+    await refreshReviewQueueCache()
+  }
+}
+
+export async function upsertContextLayer(
+  layerKey: string,
+  data: { label: string; category: string; description?: string | null; geojson: unknown }
+) {
+  const featureCount =
+    (data.geojson as { features?: unknown[] })?.features?.length ?? 0
+
+  await query(
+    `
+      INSERT INTO context_layers (layer_key, label, category, description, geojson, feature_count, updated_at)
+      VALUES ($1, $2, $3, $4, $5::jsonb, $6, NOW())
+      ON CONFLICT (layer_key) DO UPDATE SET
+        label = EXCLUDED.label,
+        category = EXCLUDED.category,
+        description = EXCLUDED.description,
+        geojson = EXCLUDED.geojson,
+        feature_count = EXCLUDED.feature_count,
+        updated_at = NOW()
+    `,
+    [layerKey, data.label, data.category, data.description ?? null, JSON.stringify(data.geojson), featureCount]
+  )
+
+  await refreshQueueIfNeeded([layerKey])
+}
+
+export async function refreshReviewQueueFromLayers(): Promise<void> {
+  await refreshReviewQueueCache()
 }
 
 export async function getContextLayerByKey(key: string) {

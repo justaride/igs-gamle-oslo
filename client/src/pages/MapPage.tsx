@@ -1,4 +1,5 @@
 import Map from '../components/Map'
+import ReviewQueuePanel from '../components/ReviewQueuePanel'
 import SiteSidebar from '../components/SiteSidebar'
 import ExportButton from '../components/ExportButton'
 import SiteSearch from '../components/SiteSearch'
@@ -86,7 +87,7 @@ export default function MapPage() {
         <div className="map-container">
           <Map />
         </div>
-        <SiteSidebar />
+        {selectedSiteId ? <SiteSidebar /> : <ReviewQueuePanel />}
       </div>
     </div>
   )

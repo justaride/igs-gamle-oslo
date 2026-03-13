@@ -4,8 +4,10 @@ from sqlalchemy import create_engine, text
 from config import DATABASE_URL as DEFAULT_DB_URL, CRS_WGS84, CRS_UTM
 import json
 import os
+import requests
 
 DATABASE_URL = os.environ.get('DATABASE_URL', DEFAULT_DB_URL)
+API_BASE_URL = os.environ.get('API_BASE_URL', 'http://localhost:3001')
 
 def ensure_multi(geom):
     if geom.geom_type == 'Polygon':
@@ -143,3 +145,11 @@ def seed_context_layers(context_layers):
             })
 
         print(f'Seeded {len(context_layers)} context layers')
+
+    try:
+        resp = requests.post(f'{API_BASE_URL}/api/context-layers/refresh-review-queue', timeout=120)
+        resp.raise_for_status()
+        print('Review queue cache refreshed after context layer update')
+    except Exception as e:
+        print(f'Warning: could not refresh review queue cache via API: {e}')
+        print('Run POST /api/context-layers/refresh-review-queue manually when the server is up')

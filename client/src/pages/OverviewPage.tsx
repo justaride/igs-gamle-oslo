@@ -1,5 +1,6 @@
 import { OVERVIEW_ELEMENT_DETAILS, STATUS_DETAILS, IGS_TYPE_DETAILS } from '../data/mapMetadata'
 import { useParks } from '../hooks/useParks'
+import { useReviewQueue } from '../hooks/useReviewQueue'
 import { useSites } from '../hooks/useSites'
 import { useSpecies } from '../hooks/useSpecies'
 import { formatArea, formatNumber, getDashboardMetrics } from '../lib/dashboardMetrics'
@@ -44,8 +45,15 @@ export default function OverviewPage({
     isLoading: isParksLoading,
     isError: isParksError,
   } = useParks()
+  const {
+    data: reviewQueueResponse,
+    isLoading: isReviewQueueLoading,
+    isError: isReviewQueueError,
+  } = useReviewQueue()
 
   const metrics = getDashboardMetrics(sites, species, parks)
+  const reviewQueueItems = reviewQueueResponse?.items ?? []
+  const reviewQueueAvailable = !isReviewQueueError && !isReviewQueueLoading
   const isLoading = isSitesLoading || isSpeciesLoading || isParksLoading
   const siteDataUnavailable = isSitesError || (!sites && !isSitesLoading)
   const speciesDataUnavailable = isSpeciesError || (!species && !isSpeciesLoading)
@@ -84,6 +92,7 @@ export default function OverviewPage({
           <ul className="hero-list">
             <li>4 IGS-typer med status, areal og kvalitetsindikatorer</li>
             <li>Artspunkter og formelle parker som støtte- og referanselag</li>
+            <li>Kontekstlag for terreng, edgeland og infrastruktur med automatisk revisjonskø</li>
             <li>Operativ kartflate for validering, geometrieditering og eksport</li>
           </ul>
           <div className="hero-panel-footnote">
@@ -168,6 +177,15 @@ export default function OverviewPage({
             parkDataUnavailable
               ? 'Parklaget kunne ikke lastes akkurat nå.'
               : 'Parker brukes som sammenligningslag mot de uformelle grøntområdene.'
+          }
+        />
+        <StatCard
+          label="I revisjonskø"
+          value={formatMetric(reviewQueueAvailable, isReviewQueueLoading, formatNumber(reviewQueueItems.length))}
+          note={
+            isReviewQueueError
+              ? 'Revisjonskøen kunne ikke lastes akkurat nå.'
+              : 'Steder med overlapp mot terreng- og infrastruktursignaler i QA-lagene.'
           }
         />
       </section>

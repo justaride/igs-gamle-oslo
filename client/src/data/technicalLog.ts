@@ -35,10 +35,27 @@ export const DATAFLOW_STEPS = [
   'Rådata og stedslister importeres fra Excel og prosjektspesifikke scripts.',
   'IGS-detektering, artsberiking og høydehenting utvider datagrunnlaget før lagring.',
   'PostGIS lagrer geometri og attributter som eksponeres som GeoJSON via API-et.',
-  'Dashboardet bruker de samme API-endepunktene til både oversiktssiden og kartarbeidsflaten.',
+  'Kontekstlag (terreng, edgeland, infrastruktur) importeres og brukes til å beregne revisjonskøens scorer.',
+  'Revisjonskøen caches i en egen tabell og oppdateres automatisk ved sted- og kontekstlagendringer.',
+  'Dashboardet bruker de samme API-endepunktene til oversikt, kartarbeidsflate og revisjonskø.',
 ]
 
 export const TECHNICAL_LOG_ENTRIES: TechnicalLogEntry[] = [
+  {
+    id: 'review-queue-cache',
+    date: '2026-03-13',
+    category: 'Kart',
+    title: 'Revisjonskø med cache og kontekstlag-trigger',
+    summary: 'Revisjonskøen ble flyttet fra on-demand PostGIS-spørring til en cachemodell, og kontekstlag-oppdateringer trigger nå automatisk refresh av køen.',
+    details: [
+      'review_queue_cache-tabellen lagrer ferdigberegnede scorer og overlapp mot steep_slopes, edgeland_geo_edges og residual_infra_buffers.',
+      'Enkeltredigeringer av et sted oppdaterer cache-raden for det stedet automatisk.',
+      'Full refresh av kontekstlag via pipeline eller API trigger full re-beregning av hele køen.',
+      'Ny API-rute POST /api/context-layers/refresh-review-queue for manuell trigger.',
+      'Revisjonskø-KPI lagt til på oversiktssiden, og køen er tilgjengelig i både Kartlab og Kart-fanen.',
+    ],
+    reference: '1fac700',
+  },
   {
     id: 'dashboard-overview',
     date: '2026-03-13',
