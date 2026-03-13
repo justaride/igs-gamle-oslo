@@ -4,6 +4,7 @@ import helmet from 'helmet'
 import sitesRouter from './routes/sites.js'
 import speciesRouter from './routes/species.js'
 import parksRouter from './routes/parks.js'
+import contextLayersRouter from './routes/contextLayers.js'
 import exportRouter from './routes/exportRoute.js'
 
 const app = express()
@@ -16,6 +17,7 @@ app.use(express.json({ limit: '10mb' }))
 app.use('/api/sites', sitesRouter)
 app.use('/api/species', speciesRouter)
 app.use('/api/parks', parksRouter)
+app.use('/api/context-layers', contextLayersRouter)
 app.use('/api/export', exportRouter)
 
 app.get('/api/health', (_req, res) => {

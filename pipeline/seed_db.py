@@ -12,6 +12,14 @@ def ensure_multi(geom):
         return MultiPolygon([geom])
     return geom
 
+
+def gdf_to_feature_collection(gdf):
+    if gdf is None or len(gdf) == 0:
+        return {'type': 'FeatureCollection', 'features': []}
+
+    gdf_wgs = gdf.to_crs(CRS_WGS84) if gdf.crs and str(gdf.crs) != CRS_WGS84 else gdf.copy()
+    return json.loads(gdf_wgs.to_json(drop_id=True))
+
 def seed_sites(igs_gdf):
     engine = create_engine(DATABASE_URL)
 
@@ -101,3 +109,37 @@ def seed_species(species_list):
             })
 
         print(f'Seeded {len(species_list)} species observations')
+
+
+def seed_context_layers(context_layers):
+    engine = create_engine(DATABASE_URL)
+
+    with engine.begin() as conn:
+        conn.execute(text('DELETE FROM context_layers'))
+
+        for layer_key, spec in context_layers.items():
+            feature_collection = gdf_to_feature_collection(spec.get('gdf'))
+            feature_count = len(feature_collection.get('features', []))
+
+            conn.execute(text('''
+                INSERT INTO context_layers
+                (layer_key, label, category, description, geojson, feature_count, updated_at)
+                VALUES (
+                    :layer_key,
+                    :label,
+                    :category,
+                    :description,
+                    CAST(:geojson AS jsonb),
+                    :feature_count,
+                    NOW()
+                )
+            '''), {
+                'layer_key': layer_key,
+                'label': spec['label'],
+                'category': spec['category'],
+                'description': spec.get('description'),
+                'geojson': json.dumps(feature_collection),
+                'feature_count': feature_count,
+            })
+
+        print(f'Seeded {len(context_layers)} context layers')

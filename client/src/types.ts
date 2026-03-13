@@ -52,6 +52,21 @@ export type ParkProperties = {
 export type ParkFeature = GeoJSON.Feature<GeoJSON.MultiPolygon, ParkProperties>
 export type ParkCollection = GeoJSON.FeatureCollection<GeoJSON.MultiPolygon, ParkProperties>
 
+export type ContextLayerCategory = 'reference' | 'qa'
+
+export type ContextLayer = {
+  key: string
+  label: string
+  category: ContextLayerCategory
+  description: string | null
+  featureCount: number
+  geojson: GeoJSON.FeatureCollection
+}
+
+export type ContextLayerResponse = {
+  layers: ContextLayer[]
+}
+
 export const IGS_COLORS: Record<IgsType, string> = {
   Residual: '#1a5c1a',
   Lot: '#44ff44',

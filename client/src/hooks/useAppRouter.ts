@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 
-export type AppRoute = '/' | '/map' | '/technical-log'
+export type AppRoute = '/' | '/map' | '/map-lab' | '/technical-log'
 
-const VALID_ROUTES = new Set<AppRoute>(['/', '/map', '/technical-log'])
+const VALID_ROUTES = new Set<AppRoute>(['/', '/map', '/map-lab', '/technical-log'])
 
 function normalizePath(pathname: string): AppRoute {
   const normalized = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname

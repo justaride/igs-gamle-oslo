@@ -38,6 +38,13 @@ export const api = {
 
   getParks: () => fetchJSON('/parks'),
 
+  getContextLayers: (keys?: string[]) => {
+    const query = keys && keys.length > 0
+      ? `?keys=${encodeURIComponent(keys.join(','))}`
+      : ''
+    return fetchJSON(`/context-layers${query}`)
+  },
+
   downloadExcel: async () => {
     const res = await fetch(`${BASE}/export/excel`)
     const blob = await res.blob()

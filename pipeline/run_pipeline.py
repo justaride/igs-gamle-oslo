@@ -45,6 +45,11 @@ def main():
     igs = detect_all(data, steep_slopes)
     print()
 
+    print('Step 4: Building context layers...')
+    from build_context_layers import build_context_layers
+    context_layers = build_context_layers(data, steep_slopes)
+    print(f'Built {len(context_layers)} context layers\n')
+
     if args.output:
         igs_wgs = igs.to_crs('EPSG:4326')
         igs_wgs.to_file(args.output, driver='GeoJSON')
@@ -54,14 +59,15 @@ def main():
         print('Dry run — skipping database seed')
         return
 
-    print('Step 4: Seeding database...')
-    from seed_db import seed_sites, seed_parks, seed_species
+    print('Step 5: Seeding database...')
+    from seed_db import seed_sites, seed_parks, seed_species, seed_context_layers
     seed_sites(igs)
     seed_parks(data['parks'])
+    seed_context_layers(context_layers)
     print()
 
     if not args.skip_species:
-        print('Step 5: Fetching species data...')
+        print('Step 6: Fetching species data...')
         from fetch_species import fetch_species_for_sites
 
         from sqlalchemy import create_engine, text
@@ -85,7 +91,7 @@ def main():
         seed_species(species)
         print()
     else:
-        print('Step 5: Skipping species (--skip-species)\n')
+        print('Step 6: Skipping species (--skip-species)\n')
 
     print('=== Pipeline complete ===')
 

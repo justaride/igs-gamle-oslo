@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { type MouseEvent, useEffect } from 'react'
 import { type AppRoute, useAppRouter } from './hooks/useAppRouter'
 import MapPage from './pages/MapPage'
+import MapLabPage from './pages/MapLabPage'
 import OverviewPage from './pages/OverviewPage'
 import TechnicalLogPage from './pages/TechnicalLogPage'
 import './app.css'
@@ -15,6 +16,11 @@ const queryClient = new QueryClient({
 const ROUTES: Array<{ path: AppRoute; label: string; description: string }> = [
   { path: '/', label: 'Oversikt', description: 'Introduksjon, nøkkeltall og kartinnhold' },
   { path: '/map', label: 'Kart', description: 'Operativ arbeidsflate for validering og redigering' },
+  {
+    path: '/map-lab',
+    label: 'Kartlab',
+    description: 'Alternativ arbeidsflate for utforsking og nye kartvisninger',
+  },
   {
     path: '/technical-log',
     label: 'Teknisk logg',
@@ -74,8 +80,13 @@ function AppContent() {
           ))}
         </nav>
       </header>
-      <main className={`dashboard-page ${pathname === '/map' ? 'dashboard-page-map' : ''}`}>
+      <main
+        className={`dashboard-page ${
+          pathname === '/map' ? 'dashboard-page-map' : pathname === '/map-lab' ? 'dashboard-page-lab' : ''
+        }`}
+      >
         {pathname === '/map' && <MapPage />}
+        {pathname === '/map-lab' && <MapLabPage onOpenMap={() => navigate('/map')} />}
         {pathname === '/' && (
           <OverviewPage
             onOpenMap={() => navigate('/map')}
