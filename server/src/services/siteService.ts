@@ -113,14 +113,22 @@ export async function getReviewQueue(limit = 200) {
     `
       WITH layer_matrix AS (
         SELECT
-          ST_UnaryUnion(ST_Collect(ST_SetSRID(ST_GeomFromGeoJSON((feature->'geometry')::text), 4326)))
-            FILTER (WHERE cl.layer_key = 'steep_slopes') AS steep_geom,
-          ST_UnaryUnion(ST_Collect(ST_SetSRID(ST_GeomFromGeoJSON((feature->'geometry')::text), 4326)))
-            FILTER (WHERE cl.layer_key = 'edgeland_geo_edges') AS geo_geom,
-          ST_UnaryUnion(ST_Collect(ST_SetSRID(ST_GeomFromGeoJSON((feature->'geometry')::text), 4326)))
-            FILTER (WHERE cl.layer_key = 'residual_infra_buffers') AS residual_geom,
-          ST_UnaryUnion(ST_Collect(ST_SetSRID(ST_GeomFromGeoJSON((feature->'geometry')::text), 4326)))
-            FILTER (WHERE cl.layer_key = 'residual_road_surface_mask') AS road_geom
+          ST_UnaryUnion(
+            ST_Collect(ST_SetSRID(ST_GeomFromGeoJSON((feature->'geometry')::text), 4326))
+              FILTER (WHERE cl.layer_key = 'steep_slopes')
+          ) AS steep_geom,
+          ST_UnaryUnion(
+            ST_Collect(ST_SetSRID(ST_GeomFromGeoJSON((feature->'geometry')::text), 4326))
+              FILTER (WHERE cl.layer_key = 'edgeland_geo_edges')
+          ) AS geo_geom,
+          ST_UnaryUnion(
+            ST_Collect(ST_SetSRID(ST_GeomFromGeoJSON((feature->'geometry')::text), 4326))
+              FILTER (WHERE cl.layer_key = 'residual_infra_buffers')
+          ) AS residual_geom,
+          ST_UnaryUnion(
+            ST_Collect(ST_SetSRID(ST_GeomFromGeoJSON((feature->'geometry')::text), 4326))
+              FILTER (WHERE cl.layer_key = 'residual_road_surface_mask')
+          ) AS road_geom
         FROM context_layers cl
         LEFT JOIN LATERAL jsonb_array_elements(COALESCE(cl.geojson->'features', '[]'::jsonb)) AS f(feature) ON true
         WHERE cl.layer_key = ANY($1::text[])
