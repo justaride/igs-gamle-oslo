@@ -100,6 +100,9 @@ export default function SiteEditForm({ feature }: Props) {
           onChange={(e) => setForm({ ...form, subtype: e.target.value })}
         >
           <option value="">—</option>
+          {form.subtype && !SUBTYPE_OPTIONS[form.igs_type]?.some((o) => o.value === form.subtype) && (
+            <option value={form.subtype}>{form.subtype} (ukjent)</option>
+          )}
           {SUBTYPE_OPTIONS[form.igs_type]?.map((opt) => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
           ))}

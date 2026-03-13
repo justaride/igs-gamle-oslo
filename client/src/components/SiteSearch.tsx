@@ -22,6 +22,12 @@ export default function SiteSearch() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
+  }, [])
+
   const handleChange = (value: string) => {
     setQuery(value)
     if (timerRef.current) clearTimeout(timerRef.current)

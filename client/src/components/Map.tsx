@@ -111,7 +111,7 @@ export default function Map() {
 
       {filteredSites && (
         <GeoJSON
-          key={JSON.stringify(filteredSites.features.map((f) => f.properties.id)) + selectedSiteId + statusFilter}
+          key={JSON.stringify(filteredSites.features.map((f) => f.properties.id)) + selectedSiteId + statusFilter + editingGeometry}
           data={filteredSites}
           style={siteStyle}
           onEachFeature={onEachSite}

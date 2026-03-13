@@ -28,12 +28,22 @@ export default function DrawTools() {
       layers.eachLayer((layer) => drawnItems.addLayer(layer))
 
       const drawControl = new L.Control.Draw({
-        draw: false as unknown as L.Control.DrawConstructorOptions['draw'],
+        draw: {
+          polygon: false,
+          polyline: false,
+          rectangle: false,
+          circle: false,
+          circlemarker: false,
+          marker: false,
+        },
         edit: { featureGroup: drawnItems },
       })
       map.addControl(drawControl)
 
+      let saved = false
+
       const onEdited = (e: L.DrawEvents.Edited) => {
+        saved = true
         const editedLayers = e.layers
         editedLayers.eachLayer((layer) => {
           const geojson = (layer as L.Polygon).toGeoJSON()
@@ -46,11 +56,9 @@ export default function DrawTools() {
       }
 
       const onEditStop = () => {
-        setTimeout(() => {
-          if (useStore.getState().editingGeometry) {
-            setEditingGeometry(false)
-          }
-        }, 100)
+        if (!saved) {
+          setEditingGeometry(false)
+        }
       }
 
       map.on(L.Draw.Event.EDITED, onEdited as L.LeafletEventHandlerFn)
