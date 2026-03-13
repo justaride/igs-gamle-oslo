@@ -20,14 +20,14 @@ export const CONTEXT_LAYER_STYLES: Record<string, ContextLayerStyle> = {
     weight: 1,
   },
   highways: {
-    defaultVisible: true,
+    defaultVisible: false,
     placement: 'overlay',
     color: '#ff9f43',
     weight: 2.2,
     dashArray: '9,4',
   },
   railways: {
-    defaultVisible: true,
+    defaultVisible: false,
     placement: 'overlay',
     color: '#ff5f6d',
     weight: 2.1,

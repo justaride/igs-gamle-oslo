@@ -332,10 +332,10 @@ export default function MapLabPage({ onOpenMap }: MapLabPageProps) {
   const [focusFilter, setFocusFilter] = useState<FocusFilter>('all')
   const [selectedSiteId, setSelectedSiteId] = useState<number | null>(null)
   const [showParks, setShowParks] = useState(true)
-  const [showSpecies, setShowSpecies] = useState(true)
-  const [showCentroids, setShowCentroids] = useState(true)
+  const [showSpecies, setShowSpecies] = useState(false)
+  const [showCentroids, setShowCentroids] = useState(false)
   const [showLabels, setShowLabels] = useState(false)
-  const [showSignals, setShowSignals] = useState(true)
+  const [showSignals, setShowSignals] = useState(false)
   const [fillOpacity, setFillOpacity] = useState(0.24)
   const [statusVisibility, setStatusVisibility] = useState<Record<SiteStatus, boolean>>({
     candidate: true,
@@ -483,6 +483,8 @@ export default function MapLabPage({ onOpenMap }: MapLabPageProps) {
         highways: true,
         railways: true,
         waterways: true,
+        steep_slopes: true,
+        edgeland_geo_edges: true,
         residual_infra_buffers: true,
         residual_road_surface_mask: true,
       })
@@ -529,7 +531,6 @@ export default function MapLabPage({ onOpenMap }: MapLabPageProps) {
       highways: true,
       railways: true,
       residual_infra_buffers: true,
-      residual_road_surface_mask: true,
       lot_candidate_source: true,
       opportunity_candidate_source: true,
     })
@@ -576,8 +577,8 @@ export default function MapLabPage({ onOpenMap }: MapLabPageProps) {
           <h2>Alternativ arbeidsflate for utforsking, lesbarhet og videre korrigering</h2>
           <p className="page-intro">
             Denne siden beholder dagens operative kart urørt, men gir et eget laboratorium for
-            alternative bakgrunnskart, datamodi og signal-lag før neste fase med rå OSM- og
-            QA-lag.
+            alternative bakgrunnskart, datamodi og referanse-/QA-lag som kan brukes i videre
+            korrigering og granulering.
           </p>
           <div className="hero-actions">
             <button className="btn btn-primary" onClick={onOpenMap}>
@@ -594,7 +595,8 @@ export default function MapLabPage({ onOpenMap }: MapLabPageProps) {
             <li>Signal-lag som peker ut muligheter, press og artsfunn.</li>
           </ul>
           <div className="hero-panel-footnote">
-            Neste steg er å koble på rålag fra pipeline: bygg, vei, bane, vann, landuse og bufferlag.
+            Laben er nå koblet til rå referanselag og QA-lag fra pipelinen, inkludert terrenglag
+            når høydejobben er kjørt.
           </div>
         </aside>
       </section>

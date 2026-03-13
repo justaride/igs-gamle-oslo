@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import requests
 import geopandas as gpd
@@ -10,7 +11,21 @@ from config import (
 )
 
 KARTVERKET_URL = 'https://ws.geonorge.no/hoydedata/v1/punkt'
-MAX_WORKERS = 20
+
+
+def env_int(name, default):
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        return default
+
+
+MAX_WORKERS = env_int('ELEVATION_MAX_WORKERS', 20)
+REQUEST_TIMEOUT_S = env_int('ELEVATION_REQUEST_TIMEOUT_S', 15)
+MAX_RETRIES = env_int('ELEVATION_MAX_RETRIES', 3)
 
 def create_elevation_grid():
     study_area = gpd.GeoDataFrame(
@@ -31,13 +46,13 @@ def create_elevation_grid():
 def _fetch_one(args):
     idx, lat, lon = args
     session = requests.Session()
-    for attempt in range(3):
+    for attempt in range(MAX_RETRIES):
         try:
             resp = session.get(KARTVERKET_URL, params={
                 'nord': lat,
                 'ost': lon,
                 'koordsys': 4326,
-            }, timeout=15)
+            }, timeout=REQUEST_TIMEOUT_S)
             if resp.ok:
                 data = resp.json()
                 return idx, data.get('punkter', [{}])[0].get('z', None)
@@ -47,7 +62,7 @@ def _fetch_one(args):
                 continue
             return idx, None
         except Exception:
-            if attempt < 2:
+            if attempt < MAX_RETRIES - 1:
                 import time
                 time.sleep(0.5)
             continue
