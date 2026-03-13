@@ -30,7 +30,7 @@ type MapLabPageProps = {
   onOpenMap: () => void
 }
 
-type BasemapKey = 'osm' | 'topo' | 'topograatone'
+type BasemapKey = 'osm' | 'topo' | 'topograatone' | 'positron' | 'dark_matter' | 'voyager' | 'satellite'
 type ColorMode = 'type' | 'status' | 'opportunity' | 'pressure' | 'biodiversity'
 type FocusFilter = 'all' | 'opportunities' | 'hidden_gems' | 'pressure'
 type PresetId = 'comparison' | 'correction' | 'ecology' | 'triage'
@@ -48,6 +48,7 @@ type BasemapDefinition = {
   description: string
   url: string
   attribution: string
+  maxZoom?: number
 }
 
 type ColorModeDefinition = {
@@ -86,6 +87,38 @@ const BASEMAPS: BasemapDefinition[] = [
     description: 'Demper bakgrunnen og gjør det enklere å lese polygoner, status og signaler.',
     url: 'https://cache.kartverket.no/v1/wmts/1.0.0/topograatone/default/webmercator/{z}/{y}/{x}.png',
     attribution: '&copy; <a href="https://www.kartverket.no/">Kartverket</a>',
+  },
+  {
+    key: 'positron',
+    label: 'Positron',
+    description: 'Lys, minimalistisk bakgrunn — perfekt for fargerik polygon-analyse.',
+    url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    maxZoom: 20,
+  },
+  {
+    key: 'dark_matter',
+    label: 'Dark Matter',
+    description: 'Mørkt tema — polygoner og signaler popper mot svart bakgrunn.',
+    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    maxZoom: 20,
+  },
+  {
+    key: 'voyager',
+    label: 'Voyager',
+    description: 'Fargerikt med terrengdetaljer, god for grøntområder og økologi.',
+    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    maxZoom: 20,
+  },
+  {
+    key: 'satellite',
+    label: 'Satellitt',
+    description: 'Ortofoto for visuell verifisering av geometri og arealbruk.',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    attribution: 'Tiles &copy; Esri',
+    maxZoom: 19,
   },
 ]
 
@@ -557,7 +590,7 @@ export default function MapLabPage({ onOpenMap }: MapLabPageProps) {
 
   const applyPreset = (preset: PresetId) => {
     if (preset === 'comparison') {
-      setBasemap('topograatone')
+      setBasemap('positron')
       setColorMode('type')
       setFocusFilter('all')
       setShowParks(true)
@@ -601,7 +634,7 @@ export default function MapLabPage({ onOpenMap }: MapLabPageProps) {
     }
 
     if (preset === 'ecology') {
-      setBasemap('topo')
+      setBasemap('voyager')
       setColorMode('biodiversity')
       setFocusFilter('all')
       setShowParks(true)
@@ -974,7 +1007,7 @@ export default function MapLabPage({ onOpenMap }: MapLabPageProps) {
               zoom={14}
               style={{ height: '100%', width: '100%' }}
             >
-              <TileLayer key={activeBasemap.key} attribution={activeBasemap.attribution} url={activeBasemap.url} />
+              <TileLayer key={activeBasemap.key} attribution={activeBasemap.attribution} url={activeBasemap.url} maxZoom={activeBasemap.maxZoom ?? 18} />
 
               {underlayContextLayers.map((layer) => {
                 const style = getContextLayerStyle(layer.key)
