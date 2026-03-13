@@ -1174,6 +1174,26 @@ a {
   grid-template-columns: 1fr;
 }
 
+.map-lab-inline-actions,
+.map-lab-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.map-lab-inline-actions {
+  justify-content: space-between;
+}
+
+.map-lab-inline-actions .map-lab-help {
+  max-width: 28ch;
+}
+
+.map-lab-action-row .btn {
+  flex: 1 1 180px;
+}
+
 .map-lab-option {
   display: flex;
   flex-direction: column;
@@ -1499,6 +1519,12 @@ a {
   .map-lab-option-grid,
   .map-lab-selected-grid {
     grid-template-columns: 1fr;
+  }
+
+  .map-lab-inline-actions,
+  .map-lab-action-row {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .map-lab-stage-head {

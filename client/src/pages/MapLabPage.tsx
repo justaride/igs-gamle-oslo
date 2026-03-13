@@ -13,6 +13,7 @@ import { useContextLayers } from '../hooks/useContextLayers'
 import { useParks } from '../hooks/useParks'
 import { useSites } from '../hooks/useSites'
 import { useSpecies } from '../hooks/useSpecies'
+import { useStore } from '../hooks/useStore'
 import { formatArea, formatNumber } from '../lib/dashboardMetrics'
 import {
   type ContextLayer,
@@ -173,6 +174,48 @@ const EMPTY_SPECIES_STATS: SiteSpeciesStats = {
   alienCount: 0,
 }
 
+const MAP_LAB_STORAGE_KEY = 'igs-map-lab-state-v1'
+
+type MapLabPersistedState = {
+  basemap: BasemapKey
+  colorMode: ColorMode
+  focusFilter: FocusFilter
+  showParks: boolean
+  showSpecies: boolean
+  showCentroids: boolean
+  showLabels: boolean
+  showSignals: boolean
+  fillOpacity: number
+  statusVisibility: Record<SiteStatus, boolean>
+  contextVisibility: Record<string, boolean>
+}
+
+function loadPersistedMapLabState(): MapLabPersistedState | null {
+  if (typeof window === 'undefined') return null
+
+  try {
+    const raw = window.localStorage.getItem(MAP_LAB_STORAGE_KEY)
+    if (!raw) return null
+
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return null
+
+    return parsed as MapLabPersistedState
+  } catch {
+    return null
+  }
+}
+
+function savePersistedMapLabState(state: MapLabPersistedState) {
+  if (typeof window === 'undefined') return
+  window.localStorage.setItem(MAP_LAB_STORAGE_KEY, JSON.stringify(state))
+}
+
+function clearPersistedMapLabState() {
+  if (typeof window === 'undefined') return
+  window.localStorage.removeItem(MAP_LAB_STORAGE_KEY)
+}
+
 function getDefaultContextVisibility(layers: ContextLayer[]) {
   return Object.fromEntries(
     layers.map((layer) => [layer.key, getContextLayerStyle(layer.key).defaultVisible])
@@ -318,6 +361,7 @@ function LabStat({
 }
 
 export default function MapLabPage({ onOpenMap }: MapLabPageProps) {
+  const { selectSite, setFlyToSiteId, setEditMode, setEditingGeometry } = useStore()
   const { data: sites, isLoading: isSitesLoading, isError: isSitesError } = useSites()
   const { data: parks, isLoading: isParksLoading } = useParks()
   const { data: species, isLoading: isSpeciesLoading } = useSpecies()
@@ -326,23 +370,28 @@ export default function MapLabPage({ onOpenMap }: MapLabPageProps) {
     isLoading: isContextLayersLoading,
     isError: isContextLayersError,
   } = useContextLayers()
+  const [persistedState] = useState<MapLabPersistedState | null>(() => loadPersistedMapLabState())
 
-  const [basemap, setBasemap] = useState<BasemapKey>('topograatone')
-  const [colorMode, setColorMode] = useState<ColorMode>('type')
-  const [focusFilter, setFocusFilter] = useState<FocusFilter>('all')
+  const [basemap, setBasemap] = useState<BasemapKey>(persistedState?.basemap ?? 'topograatone')
+  const [colorMode, setColorMode] = useState<ColorMode>(persistedState?.colorMode ?? 'type')
+  const [focusFilter, setFocusFilter] = useState<FocusFilter>(persistedState?.focusFilter ?? 'all')
   const [selectedSiteId, setSelectedSiteId] = useState<number | null>(null)
-  const [showParks, setShowParks] = useState(true)
-  const [showSpecies, setShowSpecies] = useState(false)
-  const [showCentroids, setShowCentroids] = useState(false)
-  const [showLabels, setShowLabels] = useState(false)
-  const [showSignals, setShowSignals] = useState(false)
-  const [fillOpacity, setFillOpacity] = useState(0.24)
-  const [statusVisibility, setStatusVisibility] = useState<Record<SiteStatus, boolean>>({
-    candidate: true,
-    validated: true,
-    rejected: true,
-  })
-  const [contextVisibility, setContextVisibility] = useState<Record<string, boolean>>({})
+  const [showParks, setShowParks] = useState(persistedState?.showParks ?? true)
+  const [showSpecies, setShowSpecies] = useState(persistedState?.showSpecies ?? false)
+  const [showCentroids, setShowCentroids] = useState(persistedState?.showCentroids ?? false)
+  const [showLabels, setShowLabels] = useState(persistedState?.showLabels ?? false)
+  const [showSignals, setShowSignals] = useState(persistedState?.showSignals ?? false)
+  const [fillOpacity, setFillOpacity] = useState(persistedState?.fillOpacity ?? 0.24)
+  const [statusVisibility, setStatusVisibility] = useState<Record<SiteStatus, boolean>>(
+    persistedState?.statusVisibility ?? {
+      candidate: true,
+      validated: true,
+      rejected: true,
+    }
+  )
+  const [contextVisibility, setContextVisibility] = useState<Record<string, boolean>>(
+    persistedState?.contextVisibility ?? {}
+  )
 
   const contextLayers = contextLayersResponse?.layers ?? []
 
@@ -363,6 +412,34 @@ export default function MapLabPage({ onOpenMap }: MapLabPageProps) {
       return changed ? next : current
     })
   }, [contextLayers])
+
+  useEffect(() => {
+    savePersistedMapLabState({
+      basemap,
+      colorMode,
+      focusFilter,
+      showParks,
+      showSpecies,
+      showCentroids,
+      showLabels,
+      showSignals,
+      fillOpacity,
+      statusVisibility,
+      contextVisibility,
+    })
+  }, [
+    basemap,
+    colorMode,
+    contextVisibility,
+    fillOpacity,
+    focusFilter,
+    showCentroids,
+    showLabels,
+    showParks,
+    showSignals,
+    showSpecies,
+    statusVisibility,
+  ])
 
   const speciesStatsBySite = new Map<number, SiteSpeciesStats>()
   for (const feature of species?.features ?? []) {
@@ -550,6 +627,28 @@ export default function MapLabPage({ onOpenMap }: MapLabPageProps) {
     }))
   }
 
+  const resetWorkspace = () => {
+    clearPersistedMapLabState()
+    applyPreset('comparison')
+    setSelectedSiteId(null)
+  }
+
+  const openSelectedSiteInOperationalMap = (startEditing: boolean) => {
+    if (!selectedSite) return
+
+    selectSite(selectedSite.properties.id)
+    setFlyToSiteId(selectedSite.properties.id)
+
+    if (startEditing) {
+      setEditMode('reshape')
+      setEditingGeometry(true)
+    } else {
+      setEditingGeometry(false)
+    }
+
+    onOpenMap()
+  }
+
   if (isSitesLoading) {
     return (
       <div className="map-lab-page">
@@ -618,6 +717,12 @@ export default function MapLabPage({ onOpenMap }: MapLabPageProps) {
                 <span>{preset.description}</span>
               </button>
             ))}
+          </div>
+          <div className="map-lab-inline-actions">
+            <p className="map-lab-help">Arbeidsoppsettet lagres automatisk i denne nettleseren.</p>
+            <button className="btn btn-secondary" onClick={resetWorkspace}>
+              Nullstill oppsett
+            </button>
           </div>
 
           <div className="map-lab-control-block">
@@ -1139,6 +1244,21 @@ export default function MapLabPage({ onOpenMap }: MapLabPageProps) {
                 </div>
               </div>
 
+              <div className="map-lab-action-row">
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => openSelectedSiteInOperationalMap(false)}
+                >
+                  Åpne i operativt kart
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => openSelectedSiteInOperationalMap(true)}
+                >
+                  Send til grenserevisjon
+                </button>
+              </div>
+
               <div className="map-lab-note-block">
                 <span className="eyebrow">Notat</span>
                 <p>
@@ -1169,7 +1289,7 @@ export default function MapLabPage({ onOpenMap }: MapLabPageProps) {
             <ul className="detail-list">
               <li>Ortofoto og eiendomsgrenser som siste presisjonslag for geometriarbeid.</li>
               <li>Bedre presentasjon av arealbruk og natur med egne stilprofiler per lag.</li>
-              <li>Mulighet for å låse presets per arbeidsoppgave og lagre brukerens lagvalg.</li>
+              <li>Delte team-presets som kan lagres sentralt, ikke bare lokalt per nettleser.</li>
             </ul>
           </div>
 
@@ -1179,7 +1299,7 @@ export default function MapLabPage({ onOpenMap }: MapLabPageProps) {
               : isContextLayersError
                 ? 'Kartlab virker, men kontekstlag-API-et mangler sannsynligvis migrasjon og seeddata i databasen.'
               : contextLayers.length > 0
-                ? `Kartlab bruker eksisterende API-er og ${formatNumber(contextLayers.length)} egne kontekstlag, side om side med dagens kart.`
+                ? `Kartlab bruker eksisterende API-er og ${formatNumber(contextLayers.length)} egne kontekstlag, side om side med dagens kart. Arbeidsoppsettet lagres lokalt.`
                 : 'Kartlab er klar, men kontekstlagene dukker først opp etter at ny pipeline og migrasjon er kjørt mot databasen.'}
           </div>
         </aside>
