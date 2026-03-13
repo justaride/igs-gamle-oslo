@@ -1,4 +1,6 @@
-import { MapContainer, TileLayer, GeoJSON, CircleMarker, Tooltip } from 'react-leaflet'
+import { useEffect } from 'react'
+import { MapContainer, TileLayer, GeoJSON, CircleMarker, Tooltip, useMap } from 'react-leaflet'
+import L from 'leaflet'
 import { useStore } from '../hooks/useStore'
 import { useSites } from '../hooks/useSites'
 import { useSpecies } from '../hooks/useSpecies'
@@ -6,14 +8,32 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from '../services/api'
 import { IGS_COLORS } from '../types'
 import type { SiteFeature, ParkCollection, IgsType } from '../types'
-import type { Layer, LeafletMouseEvent } from 'leaflet'
+import type { Layer } from 'leaflet'
 import LayerControl from './LayerControl'
 import Legend from './Legend'
+import DrawTools from './DrawTools'
 
 const GAMLE_OSLO_CENTER: [number, number] = [59.91, 10.78]
 
+function FlyToHandler() {
+  const map = useMap()
+  const { flyToSiteId, setFlyToSiteId } = useStore()
+  const { data: sites } = useSites()
+
+  useEffect(() => {
+    if (!flyToSiteId || !sites) return
+    const feature = sites.features.find((f) => f.properties.id === flyToSiteId)
+    if (!feature) return
+    const layer = L.geoJSON(feature.geometry)
+    map.flyToBounds(layer.getBounds(), { padding: [50, 50], maxZoom: 17 })
+    setFlyToSiteId(null)
+  }, [flyToSiteId])
+
+  return null
+}
+
 export default function Map() {
-  const { layers, selectSite, selectedSiteId } = useStore()
+  const { layers, selectSite, selectedSiteId, editingGeometry, editMode, statusFilter } = useStore()
   const { data: sites } = useSites()
   const { data: species } = useSpecies()
   const { data: parks } = useQuery<ParkCollection>({
@@ -43,16 +63,19 @@ export default function Map() {
       fillColor: IGS_COLORS[props.igs_type as IgsType] || '#888',
       fillOpacity: props.status === 'rejected' ? 0.15 : 0.45,
       weight: isSelected ? 3 : 1.5,
-      dashArray: props.status === 'candidate' ? '5,5' : undefined,
+      dashArray: props.subtype === 'Hydro-buried' ? '2,8' : props.status === 'candidate' ? '5,5' : undefined,
     }
   }
 
   const filteredSites = sites
     ? {
         ...sites,
-        features: sites.features.filter(
-          (f) => layers[f.properties.igs_type as keyof typeof layers]
-        ),
+        features: sites.features.filter((f) => {
+          if (!layers[f.properties.igs_type as keyof typeof layers]) return false
+          if (statusFilter !== 'all' && f.properties.status !== statusFilter) return false
+          if (editingGeometry && editMode === 'reshape' && f.properties.id === selectedSiteId) return false
+          return true
+        }),
       }
     : null
 
@@ -88,7 +111,7 @@ export default function Map() {
 
       {filteredSites && (
         <GeoJSON
-          key={JSON.stringify(filteredSites.features.map((f) => f.properties.id)) + selectedSiteId}
+          key={JSON.stringify(filteredSites.features.map((f) => f.properties.id)) + selectedSiteId + statusFilter}
           data={filteredSites}
           style={siteStyle}
           onEachFeature={onEachSite}
@@ -124,6 +147,8 @@ export default function Map() {
           )
         })}
 
+      <DrawTools />
+      <FlyToHandler />
       <LayerControl />
       <Legend />
     </MapContainer>

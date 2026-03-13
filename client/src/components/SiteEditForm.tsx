@@ -1,6 +1,29 @@
 import { useState, useEffect } from 'react'
 import { useUpdateSite } from '../hooks/useSites'
-import type { SiteFeature } from '../types'
+import type { SiteFeature, IgsType } from '../types'
+
+const SUBTYPE_OPTIONS: Record<IgsType, { value: string; label: string }[]> = {
+  Residual: [
+    { value: 'Road', label: 'Road' },
+    { value: 'Train', label: 'Train' },
+  ],
+  Lot: [
+    { value: 'vacant', label: 'Vacant' },
+    { value: 'brownfield', label: 'Brownfield' },
+    { value: 'construction', label: 'Construction' },
+  ],
+  Edgeland: [
+    { value: 'Hydro', label: 'Hydro' },
+    { value: 'Hydro-buried', label: 'Hydro (begravd elv)' },
+    { value: 'Bio', label: 'Bio' },
+    { value: 'Geo', label: 'Geo' },
+  ],
+  Opportunity: [
+    { value: 'commercial', label: 'Commercial' },
+    { value: 'industrial', label: 'Industrial' },
+    { value: 'retail', label: 'Retail' },
+  ],
+}
 
 type Props = { feature: SiteFeature }
 
@@ -8,6 +31,8 @@ export default function SiteEditForm({ feature }: Props) {
   const p = feature.properties
   const update = useUpdateSite()
   const [form, setForm] = useState({
+    igs_type: p.igs_type as IgsType,
+    subtype: p.subtype || '',
     name: p.name || '',
     ownership: p.ownership,
     access_control: p.access_control,
@@ -25,6 +50,8 @@ export default function SiteEditForm({ feature }: Props) {
 
   useEffect(() => {
     setForm({
+      igs_type: p.igs_type as IgsType,
+      subtype: p.subtype || '',
       name: p.name || '',
       ownership: p.ownership,
       access_control: p.access_control,
@@ -48,6 +75,36 @@ export default function SiteEditForm({ feature }: Props) {
   return (
     <div className="edit-form">
       <h4>Vurdering</h4>
+
+      <label>
+        IGS-type
+        <select
+          value={form.igs_type}
+          onChange={(e) => {
+            const newType = e.target.value as IgsType
+            const opts = SUBTYPE_OPTIONS[newType]
+            setForm({ ...form, igs_type: newType, subtype: opts[0]?.value || '' })
+          }}
+        >
+          <option value="Residual">Residual</option>
+          <option value="Lot">Lot</option>
+          <option value="Edgeland">Edgeland</option>
+          <option value="Opportunity">Opportunity</option>
+        </select>
+      </label>
+
+      <label>
+        Subtype
+        <select
+          value={form.subtype}
+          onChange={(e) => setForm({ ...form, subtype: e.target.value })}
+        >
+          <option value="">—</option>
+          {SUBTYPE_OPTIONS[form.igs_type]?.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </label>
 
       <label>
         Navn
