@@ -188,7 +188,7 @@ export async function refreshReviewQueueCache(siteIds?: number[]) {
             score,
             signal_count,
             max_overlap_ratio,
-            overlaps,
+            overlap_summary,
             reasons,
             updated_at
           ) VALUES (
@@ -337,7 +337,7 @@ export async function getReviewQueue(limit = 200) {
         score,
         signal_count AS "signalCount",
         max_overlap_ratio AS "maxOverlapRatio",
-        overlaps,
+        overlap_summary AS overlaps,
         reasons
       FROM review_queue_cache
       ORDER BY score DESC, signal_count DESC, max_overlap_ratio DESC, area_m2 DESC NULLS LAST, site_number ASC

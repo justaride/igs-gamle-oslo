@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS review_queue_cache (
   score INT NOT NULL,
   signal_count INT NOT NULL,
   max_overlap_ratio DOUBLE PRECISION NOT NULL DEFAULT 0,
-  overlaps JSONB NOT NULL DEFAULT '{}'::jsonb,
+  overlap_summary JSONB NOT NULL DEFAULT '{}'::jsonb,
   reasons TEXT[] NOT NULL DEFAULT '{}'::text[],
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT review_queue_cache_status_check CHECK (status IN ('candidate', 'validated', 'rejected'))
