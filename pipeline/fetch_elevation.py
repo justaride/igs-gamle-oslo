@@ -1,6 +1,7 @@
 import numpy as np
 import requests
 import geopandas as gpd
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from shapely.geometry import Point, box
 from config import (
     BBOX, CRS_UTM, CRS_WGS84,
@@ -9,6 +10,7 @@ from config import (
 )
 
 KARTVERKET_URL = 'https://ws.geonorge.no/hoydedata/v1/punkt'
+MAX_WORKERS = 20
 
 def create_elevation_grid():
     study_area = gpd.GeoDataFrame(
@@ -26,35 +28,49 @@ def create_elevation_grid():
 
     return grid, grid_wgs, xs, ys
 
+def _fetch_one(args):
+    idx, lat, lon = args
+    session = requests.Session()
+    for attempt in range(3):
+        try:
+            resp = session.get(KARTVERKET_URL, params={
+                'nord': lat,
+                'ost': lon,
+                'koordsys': 4326,
+            }, timeout=15)
+            if resp.ok:
+                data = resp.json()
+                return idx, data.get('punkter', [{}])[0].get('z', None)
+            if resp.status_code == 429:
+                import time
+                time.sleep(1 * (attempt + 1))
+                continue
+            return idx, None
+        except Exception:
+            if attempt < 2:
+                import time
+                time.sleep(0.5)
+            continue
+    return idx, None
+
 def fetch_elevations(grid_wgs):
-    print(f'Fetching elevation for {len(grid_wgs)} points...')
-    elevations = []
+    print(f'Fetching elevation for {len(grid_wgs)} points (using {MAX_WORKERS} threads)...')
 
     coords = [(p.y, p.x) for p in grid_wgs.geometry]
+    tasks = [(i, lat, lon) for i, (lat, lon) in enumerate(coords)]
+    elevations = [None] * len(coords)
+    done = 0
 
-    for i in range(0, len(coords), ELEVATION_BATCH_SIZE):
-        batch = coords[i:i + ELEVATION_BATCH_SIZE]
-        batch_elevations = []
-        for lat, lon in batch:
-            try:
-                resp = requests.get(KARTVERKET_URL, params={
-                    'nord': lat,
-                    'ost': lon,
-                    'koordsys': 4326,
-                    'geession': 'SRID=4326',
-                }, timeout=10)
-                if resp.ok:
-                    data = resp.json()
-                    batch_elevations.append(data.get('punkter', [{}])[0].get('z', None))
-                else:
-                    batch_elevations.append(None)
-            except Exception:
-                batch_elevations.append(None)
-        elevations.extend(batch_elevations)
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        futures = {executor.submit(_fetch_one, t): t for t in tasks}
+        for future in as_completed(futures):
+            idx, z = future.result()
+            elevations[idx] = z
+            done += 1
+            if done % 500 == 0:
+                print(f'  Processed {done}/{len(coords)} points')
 
-        if (i // ELEVATION_BATCH_SIZE) % 10 == 0:
-            print(f'  Processed {min(i + ELEVATION_BATCH_SIZE, len(coords))}/{len(coords)} points')
-
+    print(f'  Processed {len(coords)}/{len(coords)} points')
     return elevations
 
 def compute_slope(elevations, xs, ys):
