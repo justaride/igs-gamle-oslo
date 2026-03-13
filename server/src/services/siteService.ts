@@ -4,7 +4,6 @@ const REVIEW_QUEUE_LAYER_KEYS = [
   'steep_slopes',
   'edgeland_geo_edges',
   'residual_infra_buffers',
-  'residual_road_surface_mask',
 ] as const
 
 const GEOJSON_SELECT = `
@@ -124,11 +123,7 @@ export async function getReviewQueue(limit = 200) {
           ST_UnaryUnion(
             ST_Collect(ST_SetSRID(ST_GeomFromGeoJSON((feature->'geometry')::text), 4326))
               FILTER (WHERE cl.layer_key = 'residual_infra_buffers')
-          ) AS residual_geom,
-          ST_UnaryUnion(
-            ST_Collect(ST_SetSRID(ST_GeomFromGeoJSON((feature->'geometry')::text), 4326))
-              FILTER (WHERE cl.layer_key = 'residual_road_surface_mask')
-          ) AS road_geom
+          ) AS residual_geom
         FROM context_layers cl
         LEFT JOIN LATERAL jsonb_array_elements(COALESCE(cl.geojson->'features', '[]'::jsonb)) AS f(feature) ON true
         WHERE cl.layer_key = ANY($1::text[])
@@ -161,11 +156,7 @@ export async function getReviewQueue(limit = 200) {
               THEN ST_Area(ST_Transform(ST_Intersection(s.geom, lm.residual_geom), 25833))
             ELSE 0
           END AS residual_overlap_m2,
-          CASE
-            WHEN lm.road_geom IS NOT NULL AND ST_Intersects(s.geom, lm.road_geom)
-              THEN ST_Area(ST_Transform(ST_Intersection(s.geom, lm.road_geom), 25833))
-            ELSE 0
-          END AS road_overlap_m2
+          0::float8 AS road_overlap_m2
         FROM sites s
         CROSS JOIN layer_matrix lm
       ),
