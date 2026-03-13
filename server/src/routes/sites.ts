@@ -8,6 +8,12 @@ router.get('/', async (_req, res) => {
   res.json(geojson)
 })
 
+router.get('/review-queue', async (req, res) => {
+  const rawLimit = typeof req.query.limit === 'string' ? Number(req.query.limit) : undefined
+  const items = await siteService.getReviewQueue(rawLimit)
+  res.json({ items })
+})
+
 router.get('/:id', async (req, res) => {
   const feature = await siteService.getSiteById(Number(req.params.id))
   if (!feature) return res.status(404).json({ error: 'Site not found' })

@@ -11,6 +11,7 @@ import L from 'leaflet'
 import { getContextLayerStyle } from '../data/contextLayerMetadata'
 import { useContextLayers } from '../hooks/useContextLayers'
 import { useParks } from '../hooks/useParks'
+import { useReviewQueue } from '../hooks/useReviewQueue'
 import { useSites } from '../hooks/useSites'
 import { useSpecies } from '../hooks/useSpecies'
 import { useStore } from '../hooks/useStore'
@@ -19,6 +20,7 @@ import {
   type ContextLayer,
   IGS_COLORS,
   RED_LIST_CATEGORIES,
+  type ReviewQueueItem,
   STATUS_LABELS,
   type SiteFeature,
   type SiteStatus,
@@ -248,6 +250,13 @@ function getContextLayerTooltip(layer: ContextLayer, feature: GeoJSON.Feature) {
   return parts.join(' • ')
 }
 
+function formatOverlapShare(value: number) {
+  return new Intl.NumberFormat('nb-NO', {
+    style: 'percent',
+    maximumFractionDigits: 0,
+  }).format(value)
+}
+
 function FitToSites({
   featuresCount,
   geojson,
@@ -267,6 +276,21 @@ function FitToSites({
       map.fitBounds(bounds, { padding: [28, 28], maxZoom: 16 })
     }
   }, [featuresCount, fitKey, map])
+
+  return null
+}
+
+function FocusSelectedSite({ feature }: { feature: SiteFeature | null }) {
+  const map = useMap()
+
+  useEffect(() => {
+    if (!feature) return
+
+    const bounds = L.geoJSON(feature).getBounds()
+    if (bounds.isValid()) {
+      map.flyToBounds(bounds, { padding: [40, 40], maxZoom: 17 })
+    }
+  }, [feature, map])
 
   return null
 }
@@ -370,6 +394,11 @@ export default function MapLabPage({ onOpenMap }: MapLabPageProps) {
     isLoading: isContextLayersLoading,
     isError: isContextLayersError,
   } = useContextLayers()
+  const {
+    data: reviewQueueResponse,
+    isLoading: isReviewQueueLoading,
+    isError: isReviewQueueError,
+  } = useReviewQueue(240)
   const [persistedState] = useState<MapLabPersistedState | null>(() => loadPersistedMapLabState())
 
   const [basemap, setBasemap] = useState<BasemapKey>(persistedState?.basemap ?? 'topograatone')
@@ -510,6 +539,7 @@ export default function MapLabPage({ onOpenMap }: MapLabPageProps) {
   const selectedSpeciesStats = selectedSite
     ? speciesStatsBySite.get(selectedSite.properties.id) ?? EMPTY_SPECIES_STATS
     : EMPTY_SPECIES_STATS
+  const reviewQueueItems = reviewQueueResponse?.items ?? []
 
   const activeBasemap = BASEMAPS.find((entry) => entry.key === basemap) ?? BASEMAPS[0]
   const activeColorMode = COLOR_MODES.find((entry) => entry.key === colorMode) ?? COLOR_MODES[0]
@@ -522,6 +552,8 @@ export default function MapLabPage({ onOpenMap }: MapLabPageProps) {
   )
   const referenceContextLayers = contextLayers.filter((layer) => layer.category === 'reference')
   const qaContextLayers = contextLayers.filter((layer) => layer.category === 'qa')
+  const visibleReviewQueue = reviewQueueItems.filter((item) => visibleSiteIds.has(item.id))
+  const reviewQueuePreview = visibleReviewQueue.slice(0, 12)
 
   const applyPreset = (preset: PresetId) => {
     if (preset === 'comparison') {
@@ -1150,6 +1182,7 @@ export default function MapLabPage({ onOpenMap }: MapLabPageProps) {
                 geojson={filteredSites}
                 fitKey={filteredFeatures.map((feature) => feature.properties.id).join('-')}
               />
+              <FocusSelectedSite feature={selectedSite} />
             </MapContainer>
 
             <div className="map-lab-overlay map-lab-overlay-top">
@@ -1282,6 +1315,70 @@ export default function MapLabPage({ onOpenMap }: MapLabPageProps) {
               kontekstlag for referanse og QA. Det gjør at videre korrigering kan skje med langt
               mer sporbarhet enn i den opprinnelige arbeidsflaten.
             </p>
+          </div>
+
+          <div className="map-lab-note-block">
+            <div className="map-lab-block-head">
+              <span className="eyebrow">Revisjonskø</span>
+              <strong>{formatNumber(visibleReviewQueue.length)}</strong>
+            </div>
+            <p>
+              Køen prioriterer steder der polygonet overlapper terreng- og infrastruktursignaler i
+              QA-lagene. Listen følger dagens status- og fokusfilter i kartet.
+            </p>
+            {reviewQueuePreview.length > 0 ? (
+              <div className="map-lab-queue-list">
+                {reviewQueuePreview.map((item) => {
+                  const overlapSummary = [
+                    item.overlaps.steepSlopesM2 > 0
+                      ? `bratt terreng ${formatArea(item.overlaps.steepSlopesM2)}`
+                      : null,
+                    item.overlaps.geoEdgesM2 > 0
+                      ? `geo-edge ${formatArea(item.overlaps.geoEdgesM2)}`
+                      : null,
+                    item.overlaps.residualBuffersM2 > 0
+                      ? `residual ${formatArea(item.overlaps.residualBuffersM2)}`
+                      : null,
+                    item.overlaps.roadMaskM2 > 0
+                      ? `veibane ${formatArea(item.overlaps.roadMaskM2)}`
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' • ')
+
+                  return (
+                    <button
+                      key={item.id}
+                      className={`map-lab-queue-item ${
+                        selectedSiteId === item.id ? 'map-lab-queue-item-active' : ''
+                      }`}
+                      onClick={() => setSelectedSiteId(item.id)}
+                    >
+                      <div className="map-lab-queue-head">
+                        <strong>{item.siteNumber}</strong>
+                        <span className="map-lab-score-chip">Score {item.score}</span>
+                      </div>
+                      <div className="map-lab-queue-meta">
+                        <span>{item.igsType}</span>
+                        <span>{STATUS_LABELS[item.status]}</span>
+                        <span>{formatArea(item.areaM2 ?? 0)}</span>
+                        <span>{formatOverlapShare(item.maxOverlapRatio)}</span>
+                      </div>
+                      <p>{item.reasons.join(' • ')}</p>
+                      {overlapSummary ? <small>{overlapSummary}</small> : null}
+                    </button>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="empty-state map-lab-inline-empty">
+                {isReviewQueueLoading
+                  ? 'Bygger revisjonskø…'
+                  : isReviewQueueError
+                    ? 'Revisjonskøen kunne ikke lastes fra API-et.'
+                    : 'Ingen prioriterte steder matcher gjeldende filter akkurat nå.'}
+              </div>
+            )}
           </div>
 
           <div className="map-lab-note-block">

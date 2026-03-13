@@ -14,7 +14,10 @@ export function useUpdateSite() {
   return useMutation({
     mutationFn: ({ id, fields }: { id: number; fields: Record<string, unknown> }) =>
       api.updateSite(id, fields),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sites'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['sites'] })
+      qc.invalidateQueries({ queryKey: ['review-queue'] })
+    },
   })
 }
 
@@ -23,7 +26,10 @@ export function useUpdateSiteStatus() {
   return useMutation({
     mutationFn: ({ id, status }: { id: number; status: string }) =>
       api.updateSiteStatus(id, status),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sites'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['sites'] })
+      qc.invalidateQueries({ queryKey: ['review-queue'] })
+    },
   })
 }
 
@@ -32,6 +38,9 @@ export function useUpdateSiteGeometry() {
   return useMutation({
     mutationFn: ({ id, geometry }: { id: number; geometry: object }) =>
       api.updateSiteGeometry(id, geometry),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sites'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['sites'] })
+      qc.invalidateQueries({ queryKey: ['review-queue'] })
+    },
   })
 }

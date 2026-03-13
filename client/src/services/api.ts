@@ -12,6 +12,8 @@ async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
 export const api = {
   getSites: () => fetchJSON('/sites'),
 
+  getReviewQueue: (limit = 200) => fetchJSON(`/sites/review-queue?limit=${limit}`),
+
   getSite: (id: number) => fetchJSON(`/sites/${id}`),
 
   updateSite: (id: number, fields: Record<string, unknown>) =>

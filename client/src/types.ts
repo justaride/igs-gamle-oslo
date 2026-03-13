@@ -67,6 +67,36 @@ export type ContextLayerResponse = {
   layers: ContextLayer[]
 }
 
+export type ReviewQueueOverlaps = {
+  steepSlopesM2: number
+  geoEdgesM2: number
+  residualBuffersM2: number
+  roadMaskM2: number
+}
+
+export type ReviewQueueItem = {
+  id: number
+  siteNumber: string
+  igsType: IgsType
+  subtype: string | null
+  status: SiteStatus
+  areaM2: number | null
+  goodOpportunity: boolean
+  hiddenGem: boolean | null
+  dangerous: boolean | null
+  noisy: boolean | null
+  tooSmall: boolean | null
+  score: number
+  signalCount: number
+  maxOverlapRatio: number
+  overlaps: ReviewQueueOverlaps
+  reasons: string[]
+}
+
+export type ReviewQueueResponse = {
+  items: ReviewQueueItem[]
+}
+
 export const IGS_COLORS: Record<IgsType, string> = {
   Residual: '#1a5c1a',
   Lot: '#44ff44',
