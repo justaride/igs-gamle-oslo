@@ -64,3 +64,5 @@ export const STATUS_LABELS: Record<SiteStatus, string> = {
   validated: 'Validert',
   rejected: 'Avvist',
 }
+
+export const RED_LIST_CATEGORIES: readonly string[] = ['CR', 'EN', 'VU', 'NT']

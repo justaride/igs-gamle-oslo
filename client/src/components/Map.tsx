@@ -2,12 +2,11 @@ import { useEffect } from 'react'
 import { MapContainer, TileLayer, GeoJSON, CircleMarker, Tooltip, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import { useStore } from '../hooks/useStore'
+import { useParks } from '../hooks/useParks'
 import { useSites } from '../hooks/useSites'
 import { useSpecies } from '../hooks/useSpecies'
-import { useQuery } from '@tanstack/react-query'
-import { api } from '../services/api'
-import { IGS_COLORS } from '../types'
-import type { SiteFeature, ParkCollection, IgsType } from '../types'
+import { IGS_COLORS, RED_LIST_CATEGORIES } from '../types'
+import type { SiteFeature, IgsType } from '../types'
 import type { Layer } from 'leaflet'
 import LayerControl from './LayerControl'
 import Legend from './Legend'
@@ -36,10 +35,7 @@ export default function Map() {
   const { layers, selectSite, selectedSiteId, editingGeometry, editMode, statusFilter } = useStore()
   const { data: sites } = useSites()
   const { data: species } = useSpecies()
-  const { data: parks } = useQuery<ParkCollection>({
-    queryKey: ['parks'],
-    queryFn: () => api.getParks() as Promise<ParkCollection>,
-  })
+  const { data: parks } = useParks()
 
   const onEachSite = (feature: GeoJSON.Feature, layer: Layer) => {
     const props = (feature as SiteFeature).properties
@@ -121,8 +117,9 @@ export default function Map() {
       {layers.species &&
         species?.features.map((f) => {
           const isAlien = f.properties.is_alien
-          const isRedListed = f.properties.red_list_category &&
-            ['CR', 'EN', 'VU', 'NT'].includes(f.properties.red_list_category)
+          const isRedListed = f.properties.red_list_category
+            ? RED_LIST_CATEGORIES.includes(f.properties.red_list_category)
+            : false
           return (
             <CircleMarker
               key={f.properties.id}

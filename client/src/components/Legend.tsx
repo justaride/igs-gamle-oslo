@@ -1,20 +1,10 @@
-import { IGS_COLORS } from '../types'
-
-const ITEMS = [
-  { label: 'Residual IGS', color: IGS_COLORS.Residual },
-  { label: 'Lot IGS', color: IGS_COLORS.Lot },
-  { label: 'Edgelands', color: IGS_COLORS.Edgeland },
-  { label: 'Opportunity', color: IGS_COLORS.Opportunity },
-  { label: 'Parker (formelle)', color: '#88cc88', outline: true },
-  { label: 'Rødlistede arter', color: '#ff0000', dot: true },
-  { label: 'Fremmede arter', color: '#ff8800', dot: true },
-]
+import { LEGEND_ITEMS } from '../data/mapMetadata'
 
 export default function Legend() {
   return (
     <div className="legend">
       <h4>Forklaring</h4>
-      {ITEMS.map(({ label, color, outline, dot }) => (
+      {LEGEND_ITEMS.map(({ id, label, color, outline, dot }) => (
         <div key={label} className="legend-item">
           {dot ? (
             <span className="legend-dot" style={{ backgroundColor: color }} />

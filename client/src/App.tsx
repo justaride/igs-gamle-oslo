@@ -1,12 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import Map from './components/Map'
-import SiteSidebar from './components/SiteSidebar'
-import ExportButton from './components/ExportButton'
-import SiteSearch from './components/SiteSearch'
-import { useStore } from './hooks/useStore'
-import { useSites } from './hooks/useSites'
-import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
-import type { SiteStatus } from './types'
+import { type MouseEvent, useEffect } from 'react'
+import { type AppRoute, useAppRouter } from './hooks/useAppRouter'
+import MapPage from './pages/MapPage'
+import OverviewPage from './pages/OverviewPage'
+import TechnicalLogPage from './pages/TechnicalLogPage'
 import './app.css'
 
 const queryClient = new QueryClient({
@@ -15,81 +12,82 @@ const queryClient = new QueryClient({
   },
 })
 
-const STATUS_FILTERS: { value: 'all' | SiteStatus; label: string }[] = [
-  { value: 'all', label: 'Alle' },
-  { value: 'candidate', label: 'Kandidat' },
-  { value: 'validated', label: 'Validert' },
-  { value: 'rejected', label: 'Avvist' },
+const ROUTES: Array<{ path: AppRoute; label: string; description: string }> = [
+  { path: '/', label: 'Oversikt', description: 'Introduksjon, nøkkeltall og kartinnhold' },
+  { path: '/map', label: 'Kart', description: 'Operativ arbeidsflate for validering og redigering' },
+  {
+    path: '/technical-log',
+    label: 'Teknisk logg',
+    description: 'Stack, dataflyt og viktige prosjektmilepæler',
+  },
 ]
 
-function StatusFilterPills() {
-  const { statusFilter, setStatusFilter } = useStore()
-  const { data: sites } = useSites()
-
-  const counts: Record<string, number> = { all: 0, candidate: 0, validated: 0, rejected: 0 }
-  if (sites) {
-    for (const f of sites.features) {
-      counts[f.properties.status]++
-      counts.all++
-    }
-  }
-
-  return (
-    <div className="status-pills">
-      {STATUS_FILTERS.map((sf) => (
-        <button
-          key={sf.value}
-          className={`status-pill ${statusFilter === sf.value ? 'status-pill-active' : ''}`}
-          onClick={() => setStatusFilter(sf.value)}
-        >
-          {sf.label} ({counts[sf.value]})
-        </button>
-      ))}
-    </div>
-  )
-}
-
 function AppContent() {
-  const { selectedSiteId, editingGeometry, setEditingGeometry, editMode, setEditMode } = useStore()
-  useKeyboardShortcuts()
+  const { pathname, navigate } = useAppRouter()
 
-  const startEdit = (mode: 'reshape' | 'redraw') => {
-    setEditMode(mode)
-    setEditingGeometry(true)
+  useEffect(() => {
+    const currentRoute = ROUTES.find((route) => route.path === pathname)
+    document.title = currentRoute
+      ? `${currentRoute.label} | IGS Gamle Oslo`
+      : 'IGS Gamle Oslo'
+  }, [pathname])
+
+  const currentRoute = ROUTES.find((route) => route.path === pathname) ?? ROUTES[0]
+
+  const handleNavClick = (event: MouseEvent<HTMLAnchorElement>, path: AppRoute) => {
+    if (
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
+      return
+    }
+
+    event.preventDefault()
+    navigate(path)
   }
 
   return (
-    <div className="app">
-      <header className="app-header">
-        <h1>IGS Gamle Oslo</h1>
-        <span className="subtitle">Uformelle grøntområder — interaktivt kartverk</span>
-        <SiteSearch />
-        <StatusFilterPills />
-        <div className="header-actions">
-          {selectedSiteId && !editingGeometry && (
-            <>
-              <button className="btn" onClick={() => startEdit('reshape')}>
-                Rediger grense
-              </button>
-              <button className="btn btn-secondary" onClick={() => startEdit('redraw')}>
-                Tegn ny polygon
-              </button>
-            </>
-          )}
-          {editingGeometry && (
-            <button className="btn btn-active" onClick={() => setEditingGeometry(false)}>
-              Avslutt {editMode === 'reshape' ? 'redigering' : 'tegning'}
-            </button>
-          )}
-          <ExportButton />
+    <div className="dashboard-shell">
+      <header className="dashboard-topbar">
+        <div className="dashboard-brand">
+          <span className="eyebrow">Informal Green Spaces</span>
+          <h1>IGS Gamle Oslo</h1>
+          <p>Dashboard for kartlegging, validering og teknisk dokumentasjon.</p>
         </div>
+        <nav className="dashboard-nav" aria-label="Dashboardnavigasjon">
+          {ROUTES.map((route) => (
+            <a
+              key={route.path}
+              href={route.path}
+              className={`dashboard-nav-link ${
+                pathname === route.path ? 'dashboard-nav-link-active' : ''
+              }`}
+              onClick={(event) => handleNavClick(event, route.path)}
+            >
+              <span>{route.label}</span>
+              <small>{route.description}</small>
+            </a>
+          ))}
+        </nav>
       </header>
-      <div className="app-body">
-        <div className="map-container">
-          <Map />
-        </div>
-        <SiteSidebar />
-      </div>
+      <main className={`dashboard-page ${pathname === '/map' ? 'dashboard-page-map' : ''}`}>
+        {pathname === '/map' && <MapPage />}
+        {pathname === '/' && (
+          <OverviewPage
+            onOpenMap={() => navigate('/map')}
+            onOpenTechnicalLog={() => navigate('/technical-log')}
+          />
+        )}
+        {pathname === '/technical-log' && <TechnicalLogPage onOpenMap={() => navigate('/map')} />}
+      </main>
+      <footer className="dashboard-footer">
+        <span>{currentRoute.label}</span>
+        <span>{currentRoute.description}</span>
+      </footer>
     </div>
   )
 }
