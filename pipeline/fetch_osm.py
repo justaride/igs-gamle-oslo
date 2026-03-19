@@ -1,7 +1,22 @@
+import os
+
 import osmnx as ox
 import geopandas as gpd
 from shapely.geometry import box
 from config import BBOX, CRS_UTM
+
+REQUEST_TIMEOUT_S = int(os.getenv('OSM_REQUEST_TIMEOUT_S', '120'))
+OVERPASS_RATE_LIMIT = os.getenv('OSM_OVERPASS_RATE_LIMIT', 'true').lower() not in {
+    '0',
+    'false',
+    'no',
+}
+OVERPASS_URL = os.getenv('OSM_OVERPASS_URL', ox.settings.overpass_url)
+
+ox.settings.requests_timeout = REQUEST_TIMEOUT_S
+ox.settings.use_cache = True
+ox.settings.overpass_rate_limit = OVERPASS_RATE_LIMIT
+ox.settings.overpass_url = OVERPASS_URL
 
 def get_study_area():
     return box(BBOX['west'], BBOX['south'], BBOX['east'], BBOX['north'])

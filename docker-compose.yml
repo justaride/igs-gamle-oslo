@@ -51,7 +51,7 @@ services:
       server:
         condition: service_healthy
     healthcheck:
-      test: ['CMD-SHELL', 'test -f /tmp/pipeline.last-success || exit 1']
+      test: ['CMD-SHELL', 'test -f /tmp/pipeline.last-success || test -f /tmp/pipeline.running || exit 1']
       interval: 30s
       timeout: 5s
       retries: 5
