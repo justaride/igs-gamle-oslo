@@ -25,6 +25,36 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:3001/api/health >/dev/null 2>&1 || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: pipeline
+    environment:
+      DATABASE_URL: postgresql://igs:${DB_PASSWORD:-igs_dev_2024}@db:5432/igs
+      API_BASE_URL: http://server:3001
+      ELEVATION_CACHE_DIR: /tmp/igs-elevation-cache
+      SPECIES_CACHE_DIR: /tmp/igs-species-cache
+      MPLCONFIGDIR: /tmp/matplotlib
+      PIPELINE_AUTO_RUN: 'true'
+      PIPELINE_KEEP_ALIVE: 'true'
+      PIPELINE_ARGS: --skip-elevation --skip-species
+    depends_on:
+      db:
+        condition: service_healthy
+      server:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'test -f /tmp/pipeline.last-success || exit 1']
+      interval: 30s
+      timeout: 5s
+      retries: 5
 
   client:
     build:

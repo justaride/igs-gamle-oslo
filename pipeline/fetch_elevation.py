@@ -1,16 +1,28 @@
+import hashlib
+import json
 import os
+import threading
+from pathlib import Path
+
+import geopandas as gpd
 import numpy as np
 import requests
-import geopandas as gpd
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from shapely.geometry import Point, box
+
 from config import (
-    BBOX, CRS_UTM, CRS_WGS84,
-    ELEVATION_GRID_SPACING_M, ELEVATION_BATCH_SIZE,
-    SLOPE_THRESHOLD_DEG
+    BBOX,
+    CRS_UTM,
+    CRS_WGS84,
+    ELEVATION_BATCH_SIZE,
+    ELEVATION_GRID_SPACING_M,
+    SLOPE_THRESHOLD_DEG,
 )
 
 KARTVERKET_URL = 'https://ws.geonorge.no/hoydedata/v1/punkt'
+DEFAULT_CACHE_DIR = Path(os.environ.get('TMPDIR', '/tmp')) / 'igs-elevation-cache'
+CACHE_DIR = Path(os.environ.get('ELEVATION_CACHE_DIR', str(DEFAULT_CACHE_DIR)))
+_thread_local = threading.local()
 
 
 def env_int(name, default):
@@ -23,9 +35,66 @@ def env_int(name, default):
         return default
 
 
+def env_bool(name, default):
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() not in {'0', 'false', 'no', 'off'}
+
+
 MAX_WORKERS = env_int('ELEVATION_MAX_WORKERS', 20)
 REQUEST_TIMEOUT_S = env_int('ELEVATION_REQUEST_TIMEOUT_S', 15)
 MAX_RETRIES = env_int('ELEVATION_MAX_RETRIES', 3)
+GRID_SPACING_M = env_int('ELEVATION_GRID_SPACING_M', ELEVATION_GRID_SPACING_M)
+BATCH_SIZE = max(env_int('ELEVATION_BATCH_SIZE', ELEVATION_BATCH_SIZE), MAX_WORKERS)
+USE_CACHE = env_bool('ELEVATION_USE_CACHE', True)
+
+
+def empty_gdf():
+    return gpd.GeoDataFrame(geometry=[], crs=CRS_UTM)
+
+
+def get_cache_path():
+    cache_key = hashlib.sha1(json.dumps({
+        'bbox': BBOX,
+        'grid_spacing_m': GRID_SPACING_M,
+        'slope_threshold_deg': SLOPE_THRESHOLD_DEG,
+        'version': 1,
+    }, sort_keys=True).encode('utf-8')).hexdigest()
+    return CACHE_DIR / f'{cache_key}.geojson'
+
+
+def load_cached_steep_areas():
+    if not USE_CACHE:
+        return None
+
+    cache_path = get_cache_path()
+    if not cache_path.exists():
+        return None
+
+    payload = json.loads(cache_path.read_text())
+    features = payload.get('features', [])
+    if not features:
+        return empty_gdf()
+
+    return gpd.GeoDataFrame.from_features(features, crs=CRS_UTM)
+
+
+def save_cached_steep_areas(gdf):
+    if not USE_CACHE:
+        return
+
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    get_cache_path().write_text(gdf.to_json(drop_id=True))
+
+
+def get_session():
+    session = getattr(_thread_local, 'session', None)
+    if session is None:
+        session = requests.Session()
+        _thread_local.session = session
+    return session
+
 
 def create_elevation_grid():
     study_area = gpd.GeoDataFrame(
@@ -34,8 +103,8 @@ def create_elevation_grid():
     ).to_crs(CRS_UTM)
 
     bounds = study_area.total_bounds
-    xs = np.arange(bounds[0], bounds[2], ELEVATION_GRID_SPACING_M)
-    ys = np.arange(bounds[1], bounds[3], ELEVATION_GRID_SPACING_M)
+    xs = np.arange(bounds[0], bounds[2], GRID_SPACING_M)
+    ys = np.arange(bounds[1], bounds[3], GRID_SPACING_M)
     grid_points = [Point(x, y) for x in xs for y in ys]
 
     grid = gpd.GeoDataFrame(geometry=grid_points, crs=CRS_UTM)
@@ -43,9 +112,10 @@ def create_elevation_grid():
 
     return grid, grid_wgs, xs, ys
 
+
 def _fetch_one(args):
     idx, lat, lon = args
-    session = requests.Session()
+    session = get_session()
     for attempt in range(MAX_RETRIES):
         try:
             resp = session.get(KARTVERKET_URL, params={
@@ -68,6 +138,7 @@ def _fetch_one(args):
             continue
     return idx, None
 
+
 def fetch_elevations(grid_wgs):
     print(f'Fetching elevation for {len(grid_wgs)} points (using {MAX_WORKERS} threads)...')
 
@@ -77,16 +148,19 @@ def fetch_elevations(grid_wgs):
     done = 0
 
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        futures = {executor.submit(_fetch_one, t): t for t in tasks}
-        for future in as_completed(futures):
-            idx, z = future.result()
-            elevations[idx] = z
-            done += 1
-            if done % 500 == 0:
-                print(f'  Processed {done}/{len(coords)} points')
+        for start in range(0, len(tasks), BATCH_SIZE):
+            batch = tasks[start:start + BATCH_SIZE]
+            futures = {executor.submit(_fetch_one, task): task for task in batch}
+            for future in as_completed(futures):
+                idx, z = future.result()
+                elevations[idx] = z
+                done += 1
+                if done % 500 == 0:
+                    print(f'  Processed {done}/{len(coords)} points')
 
     print(f'  Processed {len(coords)}/{len(coords)} points')
     return elevations
+
 
 def compute_slope(elevations, xs, ys):
     nx, ny = len(xs), len(ys)
@@ -94,11 +168,12 @@ def compute_slope(elevations, xs, ys):
 
     z_filled = np.where(np.isnan(z), np.nanmean(z), z)
 
-    dy, dx = np.gradient(z_filled, ELEVATION_GRID_SPACING_M)
+    dy, dx = np.gradient(z_filled, GRID_SPACING_M)
     slope_rad = np.arctan(np.sqrt(dx**2 + dy**2))
     slope_deg = np.degrees(slope_rad)
 
     return slope_deg
+
 
 def get_steep_areas(slope_deg, xs, ys):
     steep_points = []
@@ -110,17 +185,17 @@ def get_steep_areas(slope_deg, xs, ys):
 
     if not steep_points:
         print('  No steep areas found')
-        return gpd.GeoDataFrame(geometry=[], crs=CRS_UTM)
+        return empty_gdf()
 
     steep = gpd.GeoDataFrame(geometry=steep_points, crs=CRS_UTM)
     steep_buffered = steep.copy()
-    steep_buffered['geometry'] = steep.buffer(ELEVATION_GRID_SPACING_M)
+    steep_buffered['geometry'] = steep.buffer(GRID_SPACING_M)
 
     from shapely.ops import unary_union
     merged = unary_union(steep_buffered.geometry)
 
     if merged.is_empty:
-        return gpd.GeoDataFrame(geometry=[], crs=CRS_UTM)
+        return empty_gdf()
 
     if merged.geom_type == 'Polygon':
         geoms = [merged]
@@ -133,12 +208,21 @@ def get_steep_areas(slope_deg, xs, ys):
     print(f'  {len(result)} steep slope areas (>{SLOPE_THRESHOLD_DEG}°)')
     return result
 
+
 def fetch_steep_slopes():
+    cached = load_cached_steep_areas()
+    if cached is not None:
+        print(f'Loaded cached slope analysis ({len(cached)} polygons)')
+        return cached
+
     print('Computing slope analysis...')
     grid, grid_wgs, xs, ys = create_elevation_grid()
     elevations = fetch_elevations(grid_wgs)
     slope_deg = compute_slope(elevations, xs, ys)
-    return get_steep_areas(slope_deg, xs, ys)
+    steep_areas = get_steep_areas(slope_deg, xs, ys)
+    save_cached_steep_areas(steep_areas)
+    return steep_areas
+
 
 if __name__ == '__main__':
     steep = fetch_steep_slopes()

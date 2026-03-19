@@ -6,18 +6,39 @@ const REVIEW_QUEUE_LAYER_KEYS = [
   'residual_infra_buffers',
 ] as const
 
+const EFFECTIVE_GEOM_SQL = 'COALESCE(s.manual_geometry, s.geom)'
+const EFFECTIVE_IGS_TYPE_SQL = 'COALESCE(s.manual_igs_type, s.igs_type)'
+const EFFECTIVE_SUBTYPE_SQL = 'COALESCE(s.manual_subtype, s.subtype)'
+const EFFECTIVE_STATUS_SQL = 'COALESCE(s.manual_status, s.status)'
+const EFFECTIVE_NAME_SQL = 'COALESCE(s.manual_name, s.name)'
+const EFFECTIVE_NOTES_SQL = 'COALESCE(s.editor_notes, s.notes)'
+const ACTIVE_SITE_SQL = `
+  (
+    s.source_present = TRUE
+    OR s.manual_override = TRUE
+    OR COALESCE(s.manual_status, s.status) <> 'candidate'
+  )
+`
+const EFFECTIVE_AREA_SQL = `
+  CASE
+    WHEN s.manual_geometry IS NOT NULL
+      THEN ST_Area(ST_Transform(s.manual_geometry, 25833))
+    ELSE s.area_m2
+  END
+`
+
 const GEOJSON_SELECT = `
   json_build_object(
     'type', 'Feature',
     'id', s.id,
-    'geometry', ST_AsGeoJSON(s.geom)::json,
+    'geometry', ST_AsGeoJSON(${EFFECTIVE_GEOM_SQL})::json,
     'properties', json_build_object(
       'id', s.id,
       'site_number', s.site_number,
-      'igs_type', s.igs_type,
-      'subtype', s.subtype,
-      'status', s.status,
-      'name', s.name,
+      'igs_type', ${EFFECTIVE_IGS_TYPE_SQL},
+      'subtype', ${EFFECTIVE_SUBTYPE_SQL},
+      'status', ${EFFECTIVE_STATUS_SQL},
+      'name', ${EFFECTIVE_NAME_SQL},
       'ownership', s.ownership,
       'access_control', s.access_control,
       'access_description', s.access_description,
@@ -29,9 +50,25 @@ const GEOJSON_SELECT = `
       'dangerous', s.dangerous,
       'noisy', s.noisy,
       'too_small', s.too_small,
-      'notes', s.notes,
-      'area_m2', s.area_m2,
-      'good_opportunity', s.good_opportunity
+      'notes', ${EFFECTIVE_NOTES_SQL},
+      'area_m2', ${EFFECTIVE_AREA_SQL},
+      'good_opportunity', s.good_opportunity,
+      'manual_override', s.manual_override,
+      'auto_igs_type', s.igs_type,
+      'auto_subtype', s.subtype,
+      'auto_status', s.status,
+      'auto_name', s.name,
+      'manual_igs_type', s.manual_igs_type,
+      'manual_subtype', s.manual_subtype,
+      'manual_status', s.manual_status,
+      'manual_name', s.manual_name,
+      'buried_river', s.buried_river,
+      'community_activity_potential', s.community_activity_potential,
+      'biodiversity_potential', s.biodiversity_potential,
+      'editor_notes', s.editor_notes,
+      'reviewed_by', s.reviewed_by,
+      'reviewed_at', s.reviewed_at,
+      'source_present', s.source_present
     )
   )
 `
@@ -59,34 +96,39 @@ const REVIEW_QUEUE_COMPUTE_SQL = `
     SELECT
       s.id AS site_id,
       s.site_number,
-      s.igs_type,
-      s.subtype,
-      s.status,
-      s.area_m2,
+      COALESCE(s.manual_igs_type, s.igs_type) AS igs_type,
+      COALESCE(s.manual_subtype, s.subtype) AS subtype,
+      COALESCE(s.manual_status, s.status) AS status,
+      CASE
+        WHEN s.manual_geometry IS NOT NULL
+          THEN ST_Area(ST_Transform(s.manual_geometry, 25833))
+        ELSE s.area_m2
+      END AS area_m2,
       s.good_opportunity,
       s.hidden_gem,
       s.dangerous,
       s.noisy,
       s.too_small,
       CASE
-        WHEN lm.steep_geom IS NOT NULL AND ST_Intersects(s.geom, lm.steep_geom)
-          THEN ST_Area(ST_Transform(ST_Intersection(s.geom, lm.steep_geom), 25833))
+        WHEN lm.steep_geom IS NOT NULL AND ST_Intersects(COALESCE(s.manual_geometry, s.geom), lm.steep_geom)
+          THEN ST_Area(ST_Transform(ST_Intersection(COALESCE(s.manual_geometry, s.geom), lm.steep_geom), 25833))
         ELSE 0
       END AS steep_overlap_m2,
       CASE
-        WHEN lm.geo_geom IS NOT NULL AND ST_Intersects(s.geom, lm.geo_geom)
-          THEN ST_Area(ST_Transform(ST_Intersection(s.geom, lm.geo_geom), 25833))
+        WHEN lm.geo_geom IS NOT NULL AND ST_Intersects(COALESCE(s.manual_geometry, s.geom), lm.geo_geom)
+          THEN ST_Area(ST_Transform(ST_Intersection(COALESCE(s.manual_geometry, s.geom), lm.geo_geom), 25833))
         ELSE 0
       END AS geo_overlap_m2,
       CASE
-        WHEN lm.residual_geom IS NOT NULL AND ST_Intersects(s.geom, lm.residual_geom)
-          THEN ST_Area(ST_Transform(ST_Intersection(s.geom, lm.residual_geom), 25833))
+        WHEN lm.residual_geom IS NOT NULL AND ST_Intersects(COALESCE(s.manual_geometry, s.geom), lm.residual_geom)
+          THEN ST_Area(ST_Transform(ST_Intersection(COALESCE(s.manual_geometry, s.geom), lm.residual_geom), 25833))
         ELSE 0
       END AS residual_overlap_m2,
       0::float8 AS road_overlap_m2
     FROM sites s
     CROSS JOIN layer_matrix lm
-    WHERE ($2::int[] IS NULL OR s.id = ANY($2::int[]))
+    WHERE (${ACTIVE_SITE_SQL})
+      AND ($2::int[] IS NULL OR s.id = ANY($2::int[]))
   ),
   ranked AS (
     SELECT
@@ -237,9 +279,10 @@ export async function getAllSites() {
   const result = await query(`
     SELECT json_build_object(
       'type', 'FeatureCollection',
-      'features', COALESCE(json_agg(${GEOJSON_SELECT}), '[]'::json)
+      'features', COALESCE(json_agg(${GEOJSON_SELECT} ORDER BY s.site_number), '[]'::json)
     ) AS geojson
     FROM sites s
+    WHERE ${ACTIVE_SITE_SQL}
   `)
   return result.rows[0].geojson
 }
@@ -253,25 +296,44 @@ export async function getSiteById(id: number) {
 }
 
 export async function updateSite(id: number, fields: Record<string, unknown>) {
-  const allowed = [
-    'name', 'ownership', 'access_control', 'access_description',
-    'natural_barrier', 'maintenance', 'maintenance_frequency',
-    'prox_housing', 'hidden_gem', 'dangerous', 'noisy', 'too_small',
-    'notes', 'igs_type', 'subtype',
-  ]
+  const columnMap: Record<string, string> = {
+    name: 'manual_name',
+    ownership: 'ownership',
+    access_control: 'access_control',
+    access_description: 'access_description',
+    natural_barrier: 'natural_barrier',
+    maintenance: 'maintenance',
+    maintenance_frequency: 'maintenance_frequency',
+    prox_housing: 'prox_housing',
+    hidden_gem: 'hidden_gem',
+    dangerous: 'dangerous',
+    noisy: 'noisy',
+    too_small: 'too_small',
+    notes: 'editor_notes',
+    igs_type: 'manual_igs_type',
+    subtype: 'manual_subtype',
+    buried_river: 'buried_river',
+    community_activity_potential: 'community_activity_potential',
+    biodiversity_potential: 'biodiversity_potential',
+    editor_notes: 'editor_notes',
+    reviewed_by: 'reviewed_by',
+    reviewed_at: 'reviewed_at',
+  }
   const updates: string[] = []
   const values: unknown[] = []
   let idx = 1
 
-  for (const key of allowed) {
+  for (const [key, column] of Object.entries(columnMap)) {
     if (key in fields) {
-      updates.push(`${key} = $${idx}`)
+      updates.push(`${column} = $${idx}`)
       values.push(fields[key])
       idx++
     }
   }
 
   if (updates.length === 0) return null
+
+  updates.push('manual_override = TRUE')
 
   updates.push(`updated_at = NOW()`)
   values.push(id)
@@ -290,8 +352,8 @@ export async function updateSite(id: number, fields: Record<string, unknown>) {
 
 export async function updateSiteGeometry(id: number, geojson: object) {
   const result = await query(
-    `UPDATE sites SET geom = ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON($1), 4326)),
-     area_m2 = ST_Area(ST_Transform(ST_SetSRID(ST_GeomFromGeoJSON($1), 4326), 25833)),
+    `UPDATE sites SET manual_geometry = ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON($1), 4326)),
+     manual_override = TRUE,
      updated_at = NOW()
      WHERE id = $2 RETURNING id`,
     [JSON.stringify(geojson), id]
@@ -306,8 +368,38 @@ export async function updateSiteGeometry(id: number, geojson: object) {
 
 export async function updateSiteStatus(id: number, status: string) {
   const result = await query(
-    `UPDATE sites SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING id`,
+    `UPDATE sites
+     SET manual_status = $1,
+         manual_override = TRUE,
+         reviewed_at = CASE
+           WHEN $1 = 'candidate' THEN reviewed_at
+           ELSE NOW()
+         END,
+         updated_at = NOW()
+     WHERE id = $2 RETURNING id`,
     [status, id]
+  )
+
+  if (result.rows[0]) {
+    await refreshReviewQueueCacheForSite(id)
+  }
+
+  return result.rows[0]
+}
+
+export async function resetSiteOverrides(id: number) {
+  const result = await query(
+    `UPDATE sites
+     SET manual_geometry = NULL,
+         manual_igs_type = NULL,
+         manual_subtype = NULL,
+         manual_name = NULL,
+         manual_status = NULL,
+         manual_override = FALSE,
+         updated_at = NOW()
+     WHERE id = $1
+     RETURNING id`,
+    [id]
   )
 
   if (result.rows[0]) {

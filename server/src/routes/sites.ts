@@ -42,4 +42,10 @@ router.patch('/:id/status', async (req, res) => {
   res.json(result)
 })
 
+router.post('/:id/reset-overrides', async (req, res) => {
+  const result = await siteService.resetSiteOverrides(Number(req.params.id))
+  if (!result) return res.status(404).json({ error: 'Site not found' })
+  res.json(result)
+})
+
 export default router

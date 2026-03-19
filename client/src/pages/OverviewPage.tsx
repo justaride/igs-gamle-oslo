@@ -1,4 +1,5 @@
 import { OVERVIEW_ELEMENT_DETAILS, STATUS_DETAILS, IGS_TYPE_DETAILS } from '../data/mapMetadata'
+import { HERO_STATUS_ITEMS, ONBOARDING_CARDS, ONBOARDING_STEPS } from '../data/onboarding'
 import { useParks } from '../hooks/useParks'
 import { useReviewQueue } from '../hooks/useReviewQueue'
 import { useSites } from '../hooks/useSites'
@@ -89,6 +90,23 @@ export default function OverviewPage({
 
         <aside className="hero-panel">
           <span className="panel-kicker">Hva dashboardet dekker</span>
+          <div className="hero-status">
+            <span className="hero-status-badge">Deployklar onboarding</span>
+            <div className="hero-status-copy">
+              <strong>Driftsspor og redaksjonell bruk er nå bygd inn i forsiden.</strong>
+              <p>
+                Første deploy er lagt opp i trygg modus, og arbeidsflaten er strukturert for
+                videre validering fremfor lokal ad hoc-bruk.
+              </p>
+            </div>
+          </div>
+          <div className="hero-tag-list" aria-label="Driftsstatus">
+            {HERO_STATUS_ITEMS.map((item) => (
+              <span key={item} className="hero-tag">
+                {item}
+              </span>
+            ))}
+          </div>
           <ul className="hero-list">
             <li>4 IGS-typer med status, areal og kvalitetsindikatorer</li>
             <li>Artspunkter og formelle parker som støtte- og referanselag</li>
@@ -322,34 +340,39 @@ export default function OverviewPage({
 
       <section className="content-card">
         <div className="section-heading">
+          <span className="eyebrow">Onboarding</span>
+          <h3>Drift, deploy og redaksjonell bruk</h3>
+        </div>
+        <div className="onboarding-grid">
+          {ONBOARDING_CARDS.map((card) => (
+            <article key={card.id} className="onboarding-card">
+              <div className="onboarding-card-header">
+                <strong>{card.title}</strong>
+                <p>{card.description}</p>
+              </div>
+              <ul className="onboarding-list">
+                {card.bullets.map((bullet) => (
+                  <li key={bullet}>{bullet}</li>
+                ))}
+              </ul>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="content-card">
+        <div className="section-heading">
           <span className="eyebrow">Bruk</span>
-          <h3>Slik brukes dashboardet</h3>
+          <h3>Slik tas dashboardet i bruk</h3>
         </div>
         <div className="step-grid">
-          <article className="step-card">
-            <span className="step-number">1</span>
-            <strong>Start i oversikten</strong>
-            <p>
-              Bruk forsiden til å forstå omfang, statusfordeling og hvilke kartlag som inngår i
-              vurderingen.
-            </p>
-          </article>
-          <article className="step-card">
-            <span className="step-number">2</span>
-            <strong>Gå til kartarbeidsflaten</strong>
-            <p>
-              Søk opp områder, filtrer på status og åpne sidepanelet for validering, redigering og
-              artsinnsikt.
-            </p>
-          </article>
-          <article className="step-card">
-            <span className="step-number">3</span>
-            <strong>Dokumenter utviklingen</strong>
-            <p>
-              Bruk teknisk logg til å holde oversikt over deploy, pipeline-endringer og større
-              justeringer i dashboardet.
-            </p>
-          </article>
+          {ONBOARDING_STEPS.map((step) => (
+            <article key={step.id} className="step-card">
+              <span className="step-number">{step.number}</span>
+              <strong>{step.title}</strong>
+              <p>{step.description}</p>
+            </article>
+          ))}
         </div>
       </section>
     </div>

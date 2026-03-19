@@ -3,7 +3,37 @@ import { query } from '../db.js'
 
 export async function generateExcel(): Promise<ExcelJS.Workbook> {
   const result = await query(`
-    SELECT * FROM sites ORDER BY site_number
+    SELECT
+      id,
+      site_number,
+      COALESCE(manual_igs_type, igs_type) AS igs_type,
+      COALESCE(manual_subtype, subtype) AS subtype,
+      COALESCE(manual_status, status) AS status,
+      COALESCE(manual_name, name) AS name,
+      ownership,
+      access_control,
+      access_description,
+      natural_barrier,
+      maintenance,
+      maintenance_frequency,
+      prox_housing,
+      hidden_gem,
+      dangerous,
+      noisy,
+      too_small,
+      COALESCE(editor_notes, notes) AS notes,
+      CASE
+        WHEN manual_geometry IS NOT NULL
+          THEN ST_Area(ST_Transform(manual_geometry, 25833))
+        ELSE area_m2
+      END AS area_m2,
+      good_opportunity,
+      manual_override
+    FROM sites
+    WHERE source_present = TRUE
+       OR manual_override = TRUE
+       OR COALESCE(manual_status, status) <> 'candidate'
+    ORDER BY site_number
   `)
   const sites = result.rows
 

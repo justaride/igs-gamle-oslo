@@ -1,7 +1,13 @@
 import pg from 'pg'
 
+const connectionString = process.env.DATABASE_URL
+
+if (!connectionString) {
+  throw new Error('Missing required environment variable: DATABASE_URL')
+}
+
 const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://igs:igs_dev_2024@localhost:5432/igs',
+  connectionString,
 })
 
 export const query = (text: string, params?: unknown[]) => pool.query(text, params)

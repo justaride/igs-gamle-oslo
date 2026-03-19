@@ -8,6 +8,10 @@ import argparse
 
 sys.stdout.reconfigure(line_buffering=True)
 
+from config import require_env
+
+DATABASE_URL = require_env('DATABASE_URL')
+
 def main():
     parser = argparse.ArgumentParser(description='IGS detection pipeline')
     parser.add_argument('--skip-elevation', action='store_true',
@@ -71,12 +75,18 @@ def main():
         from fetch_species import fetch_species_for_sites
 
         from sqlalchemy import create_engine, text
-        from config import DATABASE_URL as DEFAULT_DB_URL
-        import os
-        engine = create_engine(os.environ.get('DATABASE_URL', DEFAULT_DB_URL))
+        engine = create_engine(DATABASE_URL)
         with engine.connect() as conn:
             result = conn.execute(text(
-                'SELECT id, ST_AsText(geom) as wkt FROM sites'
+                '''
+                SELECT
+                    id,
+                    ST_AsText(COALESCE(manual_geometry, geom)) AS wkt
+                FROM sites
+                WHERE source_present = TRUE
+                   OR manual_override = TRUE
+                   OR COALESCE(manual_status, status) <> 'candidate'
+                '''
             ))
             rows = result.fetchall()
 

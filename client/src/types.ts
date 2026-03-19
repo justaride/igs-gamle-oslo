@@ -26,6 +26,22 @@ export type SiteProperties = {
   notes: string | null
   area_m2: number | null
   good_opportunity: boolean
+  manual_override?: boolean
+  auto_igs_type?: IgsType
+  auto_subtype?: string | null
+  auto_status?: SiteStatus
+  auto_name?: string | null
+  manual_igs_type?: IgsType | null
+  manual_subtype?: string | null
+  manual_status?: SiteStatus | null
+  manual_name?: string | null
+  buried_river?: boolean | null
+  community_activity_potential?: string | null
+  biodiversity_potential?: string | null
+  editor_notes?: string | null
+  reviewed_by?: string | null
+  reviewed_at?: string | null
+  source_present?: boolean
 }
 
 export type SiteFeature = GeoJSON.Feature<GeoJSON.MultiPolygon, SiteProperties>

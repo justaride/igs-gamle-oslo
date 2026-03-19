@@ -14,10 +14,15 @@ export type Site = {
   id: number
   site_number: string
   geom: unknown
+  manual_geometry: unknown | null
   igs_type: IgsType
+  manual_igs_type: IgsType | null
   subtype: string | null
+  manual_subtype: string | null
   status: SiteStatus
+  manual_status: SiteStatus | null
   name: string | null
+  manual_name: string | null
   ownership: Ownership
   access_control: AccessControl
   access_description: string | null
@@ -30,8 +35,18 @@ export type Site = {
   noisy: boolean | null
   too_small: boolean | null
   notes: string | null
+  editor_notes: string | null
   area_m2: number | null
   good_opportunity: boolean
+  manual_override: boolean
+  buried_river: boolean | null
+  community_activity_potential: string | null
+  biodiversity_potential: string | null
+  reviewed_by: string | null
+  reviewed_at: string | null
+  source_run_id: string | null
+  source_feature_hash: string | null
+  source_present: boolean
 }
 
 export type SpeciesObservation = {

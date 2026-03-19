@@ -34,6 +34,11 @@ export const api = {
       body: JSON.stringify({ status }),
     }),
 
+  resetSiteOverrides: (id: number) =>
+    fetchJSON(`/sites/${id}/reset-overrides`, {
+      method: 'POST',
+    }),
+
   getSpecies: () => fetchJSON('/species'),
 
   getSpeciesBySite: (siteId: number) => fetchJSON(`/species/site/${siteId}`),

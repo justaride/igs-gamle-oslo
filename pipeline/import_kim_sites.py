@@ -1,10 +1,9 @@
-import os
 import pandas as pd
 import psycopg2
-from config import DATABASE_URL as DEFAULT_DB_URL
+from config import require_env
 
-DATABASE_URL = os.environ.get('DATABASE_URL', DEFAULT_DB_URL)
-EXCEL_PATH = '/Users/gabrielboen/Downloads/Informal Green Spaces/IGS Mapping Gamlebyen.xlsx'
+DATABASE_URL = require_env('DATABASE_URL')
+EXCEL_PATH = require_env('KIM_EXCEL_PATH')
 
 OWNERSHIP_MAP = {
     'Public': 'PUB',
@@ -194,6 +193,8 @@ def update_site(cur, site_number, site_data):
             too_small = %s,
             notes = %s,
             status = 'validated',
+            manual_override = TRUE,
+            reviewed_at = now(),
             updated_at = now()
         WHERE site_number = %s
     """, (
@@ -222,20 +223,6 @@ def main():
     conn = psycopg2.connect(DATABASE_URL)
     try:
         cur = conn.cursor()
-
-        cur.execute("""
-            UPDATE sites SET
-                name = NULL, ownership = 'UNK', access_control = 'O',
-                access_description = NULL, natural_barrier = NULL,
-                maintenance = NULL, maintenance_frequency = NULL,
-                prox_housing = NULL, hidden_gem = NULL, dangerous = NULL,
-                noisy = NULL, too_small = NULL, notes = NULL,
-                status = 'candidate', updated_at = now()
-            WHERE status = 'validated'
-        """)
-        reset_count = cur.rowcount
-        if reset_count:
-            print(f'Reset {reset_count} previously validated sites back to candidate\n')
 
         claimed = []
         matches = []

@@ -1,3 +1,13 @@
+import os
+
+
+def require_env(name):
+    value = os.environ.get(name)
+    if value:
+        return value
+    raise RuntimeError(f'Missing required environment variable: {name}')
+
+
 BBOX = {
     'north': 59.925,
     'south': 59.895,
@@ -7,8 +17,6 @@ BBOX = {
 
 CRS_UTM = 'EPSG:25833'
 CRS_WGS84 = 'EPSG:4326'
-
-DATABASE_URL = 'postgresql://igs:igs_dev_2024@localhost:5432/igs'
 
 BUFFER_RAIL_M = 50
 BUFFER_ROAD_M = 50
