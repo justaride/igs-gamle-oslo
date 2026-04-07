@@ -42,16 +42,25 @@ export default function DrawTools() {
 
       let saved = false
 
-      const onEdited = (e: L.DrawEvents.Edited) => {
+      const onEdited = () => {
         saved = true
-        const editedLayers = e.layers
-        editedLayers.eachLayer((layer) => {
+        const coordinates: GeoJSON.Position[][][] = []
+        drawnItems.eachLayer((layer) => {
           const geojson = (layer as L.Polygon).toGeoJSON()
+          const geom = geojson.geometry
+          if (geom.type === 'Polygon') {
+            coordinates.push(geom.coordinates as GeoJSON.Position[][])
+          } else if (geom.type === 'MultiPolygon') {
+            coordinates.push(...(geom.coordinates as GeoJSON.Position[][][]))
+          }
+        })
+
+        if (coordinates.length > 0) {
           updateGeometry.mutate({
             id: selectedSiteId,
-            geometry: geojson.geometry,
+            geometry: { type: 'MultiPolygon', coordinates },
           })
-        })
+        }
         setEditingGeometry(false)
       }
 
@@ -98,9 +107,13 @@ export default function DrawTools() {
     const onCreated = (e: L.DrawEvents.Created) => {
       const layer = e.layer
       const geojson = (layer as L.Polygon).toGeoJSON()
+      const geom = geojson.geometry
+      const multiGeom = geom.type === 'Polygon'
+        ? { type: 'MultiPolygon' as const, coordinates: [geom.coordinates] }
+        : geom
       updateGeometry.mutate({
         id: selectedSiteId,
-        geometry: geojson.geometry,
+        geometry: multiGeom,
       })
       setEditingGeometry(false)
     }
