@@ -9,6 +9,7 @@ RUN npm run build
 FROM node:20-alpine AS server
 WORKDIR /app
 COPY --from=server-build /app/server/dist ./dist
+COPY server/migrations ./migrations
 COPY --from=server-build /app/server/node_modules ./node_modules
 COPY --from=server-build /app/server/package.json ./
 EXPOSE 3001

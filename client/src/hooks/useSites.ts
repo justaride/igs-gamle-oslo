@@ -44,3 +44,14 @@ export function useUpdateSiteGeometry() {
     },
   })
 }
+
+export function useResetSiteOverrides() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id }: { id: number }) => api.resetSiteOverrides(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['sites'] })
+      qc.invalidateQueries({ queryKey: ['review-queue'] })
+    },
+  })
+}

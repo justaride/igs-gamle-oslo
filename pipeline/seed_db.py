@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 
 DATABASE_URL = require_env('DATABASE_URL')
 API_BASE_URL = os.environ.get('API_BASE_URL')
+EDITOR_API_TOKEN = os.environ.get('EDITOR_API_TOKEN')
 
 def ensure_multi(geom):
     if geom.geom_type == 'Polygon':
@@ -378,12 +379,42 @@ def seed_context_layers(context_layers):
 
         print(f'Seeded {len(context_layers)} context layers')
 
+        try:
+            conn.execute(text('''
+                INSERT INTO review_queue_cache_meta (
+                    cache_key,
+                    is_stale,
+                    stale_reason,
+                    stale_since,
+                    updated_at
+                )
+                VALUES ('default', TRUE, 'context_layers_seeded', NOW(), NOW())
+                ON CONFLICT (cache_key) DO UPDATE SET
+                    is_stale = TRUE,
+                    stale_reason = 'context_layers_seeded',
+                    stale_since = CASE
+                        WHEN review_queue_cache_meta.is_stale THEN review_queue_cache_meta.stale_since
+                        ELSE NOW()
+                    END,
+                    updated_at = NOW()
+            '''))
+        except Exception as e:
+            print(f'Warning: could not mark review queue cache as stale after context layer seed: {e}')
+
     if not API_BASE_URL:
         print('Skipping review queue refresh: API_BASE_URL is not set')
         return
 
     try:
-        resp = requests.post(f'{API_BASE_URL}/api/context-layers/refresh-review-queue', timeout=120)
+        headers = {}
+        if EDITOR_API_TOKEN:
+            headers['x-editor-token'] = EDITOR_API_TOKEN
+
+        resp = requests.post(
+            f'{API_BASE_URL}/api/context-layers/refresh-review-queue',
+            timeout=120,
+            headers=headers,
+        )
         resp.raise_for_status()
         print('Review queue cache refreshed after context layer update')
     except Exception as e:

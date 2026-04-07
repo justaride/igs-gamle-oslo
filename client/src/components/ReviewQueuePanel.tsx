@@ -3,6 +3,7 @@ import { useReviewQueue } from '../hooks/useReviewQueue'
 import { useStore } from '../hooks/useStore'
 import { useSites } from '../hooks/useSites'
 import { formatArea, formatNumber } from '../lib/dashboardMetrics'
+import { getReviewQueueStaleMessage } from '../lib/reviewQueueMeta'
 import { STATUS_LABELS, type ReviewQueueItem } from '../types'
 
 const PAGE_SIZE = 20
@@ -58,12 +59,13 @@ function QueueItem({ item, isActive, onSelect }: {
 }
 
 export default function ReviewQueuePanel() {
-  const { selectSite, statusFilter, setFlyToSiteId } = useStore()
+  const { selectSite, selectedSiteId, statusFilter, setFlyToSiteId } = useStore()
   const { data: sites } = useSites()
   const { data: reviewQueueResponse, isLoading, isError } = useReviewQueue()
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
 
   const allItems = reviewQueueResponse?.items ?? []
+  const staleMessage = getReviewQueueStaleMessage(reviewQueueResponse?.meta)
 
   const siteIds = new Set(
     sites?.features
@@ -87,13 +89,14 @@ export default function ReviewQueuePanel() {
       <p className="review-queue-desc">
         Prioritert etter overlapp mot QA-lag. Klikk for å velge et sted i kartet.
       </p>
+      {staleMessage ? <div className="inline-notice">{staleMessage}</div> : null}
       {visibleItems.length > 0 ? (
         <div className="review-queue-list">
           {visibleItems.map((item) => (
             <QueueItem
               key={item.id}
               item={item}
-              isActive={false}
+              isActive={selectedSiteId === item.id}
               onSelect={() => handleSelect(item.id)}
             />
           ))}

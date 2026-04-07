@@ -23,22 +23,19 @@ export default function SiteSearch() {
   }, [])
 
   useEffect(() => {
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current)
-    }
-  }, [])
-
-  const handleChange = (value: string) => {
-    setQuery(value)
     if (timerRef.current) clearTimeout(timerRef.current)
-    if (!value.trim()) {
+
+    const trimmedQuery = query.trim()
+    if (!trimmedQuery) {
       setResults([])
       setOpen(false)
       return
     }
+
     timerRef.current = setTimeout(() => {
       if (!sites) return
-      const q = value.toLowerCase()
+
+      const q = trimmedQuery.toLowerCase()
       const matches = sites.features.filter((f) => {
         const p = f.properties
         return (
@@ -52,6 +49,14 @@ export default function SiteSearch() {
       setResults(matches)
       setOpen(matches.length > 0)
     }, 300)
+
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
+  }, [query, sites])
+
+  const handleChange = (value: string) => {
+    setQuery(value)
   }
 
   const handleSelect = (feature: SiteFeature) => {

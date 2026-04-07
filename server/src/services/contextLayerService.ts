@@ -1,5 +1,5 @@
 import { query } from '../db.js'
-import { refreshReviewQueueCache } from './siteService.js'
+import { markReviewQueueCacheStale, refreshReviewQueueCache } from './siteService.js'
 
 const REVIEW_QUEUE_LAYER_KEYS = [
   'steep_slopes',
@@ -47,6 +47,7 @@ export async function getContextLayers(keys?: string[]) {
 async function refreshQueueIfNeeded(updatedKeys: string[]) {
   const affectsQueue = updatedKeys.some((k) => REVIEW_QUEUE_LAYER_KEYS.includes(k))
   if (affectsQueue) {
+    await markReviewQueueCacheStale('context_layer_updated')
     await refreshReviewQueueCache()
   }
 }
@@ -77,6 +78,7 @@ export async function upsertContextLayer(
 }
 
 export async function refreshReviewQueueFromLayers(): Promise<void> {
+  await markReviewQueueCacheStale('manual_refresh_requested')
   await refreshReviewQueueCache()
 }
 

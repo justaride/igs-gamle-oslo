@@ -17,12 +17,13 @@ export default function DrawTools() {
     if (!editingGeometry || !selectedSiteId) return
 
     const drawnItems = new L.FeatureGroup()
-    map.addLayer(drawnItems)
 
     if (editMode === 'reshape') {
       const sites = queryClient.getQueryData<SiteCollection>(['sites'])
       const feature = sites?.features.find((f) => f.properties.id === selectedSiteId)
       if (!feature) return
+
+      map.addLayer(drawnItems)
 
       const layers = L.geoJSON(feature.geometry)
       layers.eachLayer((layer) => drawnItems.addLayer(layer))
@@ -91,6 +92,8 @@ export default function DrawTools() {
     }
 
     // Redraw mode: draw a new polygon from scratch
+    map.addLayer(drawnItems)
+
     const drawControl = new L.Control.Draw({
       draw: {
         polygon: { allowIntersection: false, showArea: true },

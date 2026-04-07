@@ -1,9 +1,10 @@
 import { Router } from 'express'
+import { asyncHandler } from '../http.js'
 import { query } from '../db.js'
 
 const router = Router()
 
-router.get('/', async (_req, res) => {
+router.get('/', asyncHandler(async (_req, res) => {
   const result = await query(`
     SELECT json_build_object(
       'type', 'FeatureCollection',
@@ -18,6 +19,6 @@ router.get('/', async (_req, res) => {
     FROM parks p
   `)
   res.json(result.rows[0].geojson)
-})
+}))
 
 export default router

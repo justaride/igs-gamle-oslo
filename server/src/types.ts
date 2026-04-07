@@ -24,24 +24,39 @@ export type Site = {
   name: string | null
   manual_name: string | null
   ownership: Ownership
+  manual_ownership: Ownership | null
   access_control: AccessControl
+  manual_access_control: AccessControl | null
   access_description: string | null
+  manual_access_description: string | null
   natural_barrier: string | null
+  manual_natural_barrier: string | null
   maintenance: Maintenance | null
+  manual_maintenance: Maintenance | null
   maintenance_frequency: MaintenanceFrequency | null
+  manual_maintenance_frequency: MaintenanceFrequency | null
   prox_housing: boolean | null
+  manual_prox_housing: boolean | null
   hidden_gem: boolean | null
+  manual_hidden_gem: boolean | null
   dangerous: boolean | null
+  manual_dangerous: boolean | null
   noisy: boolean | null
+  manual_noisy: boolean | null
   too_small: boolean | null
+  manual_too_small: boolean | null
   notes: string | null
+  manual_notes: string | null
   editor_notes: string | null
   area_m2: number | null
   good_opportunity: boolean
   manual_override: boolean
   buried_river: boolean | null
+  manual_buried_river: boolean | null
   community_activity_potential: string | null
+  manual_community_activity_potential: string | null
   biodiversity_potential: string | null
+  manual_biodiversity_potential: string | null
   reviewed_by: string | null
   reviewed_at: string | null
   source_run_id: string | null

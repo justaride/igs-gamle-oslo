@@ -31,13 +31,43 @@ export type SiteProperties = {
   auto_subtype?: string | null
   auto_status?: SiteStatus
   auto_name?: string | null
+  auto_ownership?: Ownership
+  auto_access_control?: AccessControl
+  auto_access_description?: string | null
+  auto_natural_barrier?: string | null
+  auto_maintenance?: Maintenance | null
+  auto_maintenance_frequency?: MaintenanceFrequency | null
+  auto_prox_housing?: boolean | null
+  auto_hidden_gem?: boolean | null
+  auto_dangerous?: boolean | null
+  auto_noisy?: boolean | null
+  auto_too_small?: boolean | null
+  auto_notes?: string | null
   manual_igs_type?: IgsType | null
   manual_subtype?: string | null
   manual_status?: SiteStatus | null
   manual_name?: string | null
+  manual_ownership?: Ownership | null
+  manual_access_control?: AccessControl | null
+  manual_access_description?: string | null
+  manual_natural_barrier?: string | null
+  manual_maintenance?: Maintenance | null
+  manual_maintenance_frequency?: MaintenanceFrequency | null
+  manual_prox_housing?: boolean | null
+  manual_hidden_gem?: boolean | null
+  manual_dangerous?: boolean | null
+  manual_noisy?: boolean | null
+  manual_too_small?: boolean | null
+  manual_notes?: string | null
   buried_river?: boolean | null
+  auto_buried_river?: boolean | null
+  manual_buried_river?: boolean | null
   community_activity_potential?: string | null
+  auto_community_activity_potential?: string | null
+  manual_community_activity_potential?: string | null
   biodiversity_potential?: string | null
+  auto_biodiversity_potential?: string | null
+  manual_biodiversity_potential?: string | null
   editor_notes?: string | null
   reviewed_by?: string | null
   reviewed_at?: string | null
@@ -109,8 +139,18 @@ export type ReviewQueueItem = {
   reasons: string[]
 }
 
+export type ReviewQueueMeta = {
+  isStale: boolean
+  staleReason: string | null
+  staleSince: string | null
+  lastRefreshStartedAt: string | null
+  lastRefreshedAt: string | null
+  lastErrorAt: string | null
+}
+
 export type ReviewQueueResponse = {
   items: ReviewQueueItem[]
+  meta: ReviewQueueMeta
 }
 
 export const IGS_COLORS: Record<IgsType, string> = {

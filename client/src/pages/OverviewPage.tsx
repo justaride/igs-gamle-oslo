@@ -5,6 +5,7 @@ import { useReviewQueue } from '../hooks/useReviewQueue'
 import { useSites } from '../hooks/useSites'
 import { useSpecies } from '../hooks/useSpecies'
 import { formatArea, formatNumber, getDashboardMetrics } from '../lib/dashboardMetrics'
+import { getReviewQueueStaleMessage } from '../lib/reviewQueueMeta'
 
 type OverviewPageProps = {
   onOpenMap: () => void
@@ -54,6 +55,7 @@ export default function OverviewPage({
 
   const metrics = getDashboardMetrics(sites, species, parks)
   const reviewQueueItems = reviewQueueResponse?.items ?? []
+  const reviewQueueStaleMessage = getReviewQueueStaleMessage(reviewQueueResponse?.meta)
   const reviewQueueAvailable = !isReviewQueueError && !isReviewQueueLoading
   const isLoading = isSitesLoading || isSpeciesLoading || isParksLoading
   const siteDataUnavailable = isSitesError || (!sites && !isSitesLoading)
@@ -130,6 +132,10 @@ export default function OverviewPage({
         </div>
       )}
 
+      {!hasAnyError && reviewQueueStaleMessage && (
+        <div className="inline-notice">{reviewQueueStaleMessage}</div>
+      )}
+
       <section className="kpi-grid">
         <StatCard
           label="IGS-områder"
@@ -203,6 +209,8 @@ export default function OverviewPage({
           note={
             isReviewQueueError
               ? 'Revisjonskøen kunne ikke lastes akkurat nå.'
+              : reviewQueueStaleMessage
+                ? 'Revisjonskøen er tilgjengelig, men markert som utdatert til neste vellykkede refresh.'
               : 'Steder med overlapp mot terreng- og infrastruktursignaler i QA-lagene.'
           }
         />

@@ -26,55 +26,78 @@ const SUBTYPE_OPTIONS: Record<IgsType, { value: string; label: string }[]> = {
 }
 
 type Props = { feature: SiteFeature }
+type FormState = ReturnType<typeof buildFormState>
+
+function hasSameFormState(left: FormState, right: FormState) {
+  return (
+    left.igs_type === right.igs_type &&
+    left.subtype === right.subtype &&
+    left.name === right.name &&
+    left.ownership === right.ownership &&
+    left.access_control === right.access_control &&
+    left.access_description === right.access_description &&
+    left.natural_barrier === right.natural_barrier &&
+    left.maintenance === right.maintenance &&
+    left.maintenance_frequency === right.maintenance_frequency &&
+    left.prox_housing === right.prox_housing &&
+    left.hidden_gem === right.hidden_gem &&
+    left.dangerous === right.dangerous &&
+    left.noisy === right.noisy &&
+    left.too_small === right.too_small &&
+    left.notes === right.notes
+  )
+}
+
+function buildFormState(properties: SiteFeature['properties']) {
+  return {
+    igs_type: properties.igs_type as IgsType,
+    subtype: properties.subtype || '',
+    name: properties.name || '',
+    ownership: properties.ownership,
+    access_control: properties.access_control,
+    access_description: properties.access_description || '',
+    natural_barrier: properties.natural_barrier || '',
+    maintenance: properties.maintenance || '',
+    maintenance_frequency: properties.maintenance_frequency || '',
+    prox_housing: properties.prox_housing ?? false,
+    hidden_gem: properties.hidden_gem ?? false,
+    dangerous: properties.dangerous ?? false,
+    noisy: properties.noisy ?? false,
+    too_small: properties.too_small ?? false,
+    notes: properties.notes || '',
+  }
+}
 
 export default function SiteEditForm({ feature }: Props) {
   const p = feature.properties
   const update = useUpdateSite()
-  const [form, setForm] = useState({
-    igs_type: p.igs_type as IgsType,
-    subtype: p.subtype || '',
-    name: p.name || '',
-    ownership: p.ownership,
-    access_control: p.access_control,
-    access_description: p.access_description || '',
-    natural_barrier: p.natural_barrier || '',
-    maintenance: p.maintenance || '',
-    maintenance_frequency: p.maintenance_frequency || '',
-    prox_housing: p.prox_housing ?? false,
-    hidden_gem: p.hidden_gem ?? false,
-    dangerous: p.dangerous ?? false,
-    noisy: p.noisy ?? false,
-    too_small: p.too_small ?? false,
-    notes: p.notes || '',
-  })
+  const initialForm = buildFormState(p)
+  const [form, setForm] = useState(() => buildFormState(p))
 
   useEffect(() => {
-    setForm({
-      igs_type: p.igs_type as IgsType,
-      subtype: p.subtype || '',
-      name: p.name || '',
-      ownership: p.ownership,
-      access_control: p.access_control,
-      access_description: p.access_description || '',
-      natural_barrier: p.natural_barrier || '',
-      maintenance: p.maintenance || '',
-      maintenance_frequency: p.maintenance_frequency || '',
-      prox_housing: p.prox_housing ?? false,
-      hidden_gem: p.hidden_gem ?? false,
-      dangerous: p.dangerous ?? false,
-      noisy: p.noisy ?? false,
-      too_small: p.too_small ?? false,
-      notes: p.notes || '',
-    })
-  }, [p.id])
+    setForm(buildFormState(p))
+  }, [p])
+
+  const isDirty = !hasSameFormState(form, initialForm)
 
   const handleSave = () => {
+    if (!isDirty || update.isPending) {
+      return
+    }
+
     update.mutate({ id: p.id, fields: form })
+  }
+
+  const handleResetDraft = () => {
+    setForm(initialForm)
   }
 
   return (
     <div className="edit-form">
       <h4>Vurdering</h4>
+      <p className="edit-form-status">
+        {isDirty ? 'Du har ulagrede endringer.' : 'Skjemaet er synkronisert med gjeldende steddata.'}
+      </p>
 
       <label>
         IGS-type
@@ -244,9 +267,18 @@ export default function SiteEditForm({ feature }: Props) {
         />
       </label>
 
-      <button className="btn btn-save" onClick={handleSave} disabled={update.isPending}>
-        {update.isPending ? 'Lagrer...' : 'Lagre endringer'}
-      </button>
+      <div className="edit-form-actions">
+        <button
+          className="btn btn-secondary"
+          onClick={handleResetDraft}
+          disabled={!isDirty || update.isPending}
+        >
+          Nullstill utkast
+        </button>
+        <button className="btn btn-save" onClick={handleSave} disabled={!isDirty || update.isPending}>
+          {update.isPending ? 'Lagrer...' : 'Lagre endringer'}
+        </button>
+      </div>
     </div>
   )
 }

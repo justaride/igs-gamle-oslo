@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   CircleMarker,
   GeoJSON,
@@ -16,15 +16,18 @@ import { useSites } from '../hooks/useSites'
 import { useSpecies } from '../hooks/useSpecies'
 import { useStore } from '../hooks/useStore'
 import { formatArea, formatNumber } from '../lib/dashboardMetrics'
+import { getReviewQueueStaleMessage } from '../lib/reviewQueueMeta'
 import {
   type ContextLayer,
   IGS_COLORS,
   RED_LIST_CATEGORIES,
   type ReviewQueueItem,
   STATUS_LABELS,
+  type SiteCollection,
   type SiteFeature,
   type SiteStatus,
 } from '../types'
+import type { GeoJSON as LeafletGeoJson } from 'leaflet'
 
 type MapLabPageProps = {
   onOpenMap: () => void
@@ -65,6 +68,10 @@ type PresetDefinition = {
 }
 
 const GAMLE_OSLO_CENTER: [number, number] = [59.91, 10.78]
+const EMPTY_SITE_COLLECTION: SiteCollection = {
+  type: 'FeatureCollection',
+  features: [],
+}
 
 const BASEMAPS: BasemapDefinition[] = [
   {
@@ -454,6 +461,7 @@ export default function MapLabPage({ onOpenMap }: MapLabPageProps) {
   const [contextVisibility, setContextVisibility] = useState<Record<string, boolean>>(
     persistedState?.contextVisibility ?? {}
   )
+  const siteLayerRef = useRef<LeafletGeoJson | null>(null)
 
   const contextLayers = contextLayersResponse?.layers ?? []
 
@@ -523,6 +531,8 @@ export default function MapLabPage({ onOpenMap }: MapLabPageProps) {
 
     speciesStatsBySite.set(siteId, current)
   }
+  const speciesStatsBySiteRef = useRef(speciesStatsBySite)
+  speciesStatsBySiteRef.current = speciesStatsBySite
 
   const filteredFeatures =
     sites?.features.filter((feature) => {
@@ -573,6 +583,7 @@ export default function MapLabPage({ onOpenMap }: MapLabPageProps) {
     ? speciesStatsBySite.get(selectedSite.properties.id) ?? EMPTY_SPECIES_STATS
     : EMPTY_SPECIES_STATS
   const reviewQueueItems = reviewQueueResponse?.items ?? []
+  const reviewQueueStaleMessage = getReviewQueueStaleMessage(reviewQueueResponse?.meta)
 
   const activeBasemap = BASEMAPS.find((entry) => entry.key === basemap) ?? BASEMAPS[0]
   const activeColorMode = COLOR_MODES.find((entry) => entry.key === colorMode) ?? COLOR_MODES[0]
@@ -587,6 +598,65 @@ export default function MapLabPage({ onOpenMap }: MapLabPageProps) {
   const qaContextLayers = contextLayers.filter((layer) => layer.category === 'qa')
   const visibleReviewQueue = reviewQueueItems.filter((item) => visibleSiteIds.has(item.id))
   const reviewQueuePreview = visibleReviewQueue.slice(0, 12)
+  const fitKey = `${focusFilter}-${Number(statusVisibility.candidate)}-${Number(statusVisibility.validated)}-${Number(statusVisibility.rejected)}-${filteredFeatures.length}`
+
+  const getSiteStyle = (feature?: GeoJSON.Feature) => {
+    if (!feature) return {}
+
+    const siteFeature = feature as SiteFeature
+    const colors = getColorForSite(
+      siteFeature,
+      colorMode,
+      speciesStatsBySiteRef.current.get(siteFeature.properties.id) ?? EMPTY_SPECIES_STATS
+    )
+    const isSelected = siteFeature.properties.id === selectedSiteId
+
+    return {
+      color: isSelected ? '#ffffff' : colors.color,
+      fillColor: colors.fillColor,
+      fillOpacity,
+      weight: isSelected ? 3.2 : 1.6,
+      dashArray:
+        siteFeature.properties.status === 'candidate' ? '7,6' : undefined,
+    }
+  }
+
+  useEffect(() => {
+    const layer = siteLayerRef.current
+    if (!layer) return
+
+    layer.clearLayers()
+
+    if (!sites) {
+      return
+    }
+
+    const nextFilteredSites = {
+      ...sites,
+      features: sites.features.filter((feature) => {
+        const props = feature.properties
+
+        if (!statusVisibility[props.status]) return false
+        if (focusFilter === 'opportunities') return props.good_opportunity
+        if (focusFilter === 'hidden_gems') return Boolean(props.hidden_gem)
+        if (focusFilter === 'pressure') {
+          return Boolean(props.dangerous || props.noisy || props.too_small)
+        }
+
+        return true
+      }),
+    }
+
+    layer.addData(nextFilteredSites as GeoJSON.GeoJsonObject)
+    layer.setStyle(getSiteStyle)
+  }, [focusFilter, sites, species, statusVisibility])
+
+  useEffect(() => {
+    const layer = siteLayerRef.current
+    if (!layer) return
+
+    layer.setStyle(getSiteStyle)
+  }, [colorMode, fillOpacity, selectedSiteId, species])
 
   const applyPreset = (preset: PresetId) => {
     if (preset === 'comparison') {
@@ -1051,31 +1121,14 @@ export default function MapLabPage({ onOpenMap }: MapLabPageProps) {
 
               {filteredSites && (
                 <GeoJSON
-                  key={`${colorMode}-${fillOpacity}-${filteredFeatures.length}-${selectedSiteId ?? 'none'}`}
-                  data={filteredSites}
-                  style={(feature) => {
-                    if (!feature) return {}
-                    const siteFeature = feature as SiteFeature
-                    const colors = getColorForSite(
-                      siteFeature,
-                      colorMode,
-                      speciesStatsBySite.get(siteFeature.properties.id) ?? EMPTY_SPECIES_STATS
-                    )
-                    const isSelected = siteFeature.properties.id === selectedSiteId
-
-                    return {
-                      color: isSelected ? '#ffffff' : colors.color,
-                      fillColor: colors.fillColor,
-                      fillOpacity,
-                      weight: isSelected ? 3.2 : 1.6,
-                      dashArray:
-                        siteFeature.properties.status === 'candidate' ? '7,6' : undefined,
-                    }
-                  }}
+                  ref={siteLayerRef}
+                  key="map-lab-sites"
+                  data={EMPTY_SITE_COLLECTION}
+                  style={getSiteStyle}
                   onEachFeature={(feature, layer) => {
                     const siteFeature = feature as SiteFeature
                     const siteSpecies =
-                      speciesStatsBySite.get(siteFeature.properties.id) ?? EMPTY_SPECIES_STATS
+                      speciesStatsBySiteRef.current.get(siteFeature.properties.id) ?? EMPTY_SPECIES_STATS
 
                     layer.on({
                       click: () => setSelectedSiteId(siteFeature.properties.id),
@@ -1213,7 +1266,7 @@ export default function MapLabPage({ onOpenMap }: MapLabPageProps) {
               <FitToSites
                 featuresCount={filteredFeatures.length}
                 geojson={filteredSites}
-                fitKey={filteredFeatures.map((feature) => feature.properties.id).join('-')}
+                fitKey={fitKey}
               />
               <FocusSelectedSite feature={selectedSite} />
             </MapContainer>
@@ -1359,6 +1412,9 @@ export default function MapLabPage({ onOpenMap }: MapLabPageProps) {
               Køen prioriterer steder der polygonet overlapper terreng- og infrastruktursignaler i
               QA-lagene. Listen følger dagens status- og fokusfilter i kartet.
             </p>
+            {reviewQueueStaleMessage ? (
+              <div className="inline-notice">{reviewQueueStaleMessage}</div>
+            ) : null}
             {reviewQueuePreview.length > 0 ? (
               <div className="map-lab-queue-list">
                 {reviewQueuePreview.map((item) => {

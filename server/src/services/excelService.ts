@@ -1,38 +1,35 @@
 import ExcelJS from 'exceljs'
 import { query } from '../db.js'
+import { buildSiteSql } from './siteSql.js'
+
+const siteSql = buildSiteSql('s')
 
 export async function generateExcel(): Promise<ExcelJS.Workbook> {
   const result = await query(`
     SELECT
-      id,
-      site_number,
-      COALESCE(manual_igs_type, igs_type) AS igs_type,
-      COALESCE(manual_subtype, subtype) AS subtype,
-      COALESCE(manual_status, status) AS status,
-      COALESCE(manual_name, name) AS name,
-      ownership,
-      access_control,
-      access_description,
-      natural_barrier,
-      maintenance,
-      maintenance_frequency,
-      prox_housing,
-      hidden_gem,
-      dangerous,
-      noisy,
-      too_small,
-      COALESCE(editor_notes, notes) AS notes,
-      CASE
-        WHEN manual_geometry IS NOT NULL
-          THEN ST_Area(ST_Transform(manual_geometry, 25833))
-        ELSE area_m2
-      END AS area_m2,
-      good_opportunity,
-      manual_override
-    FROM sites
-    WHERE source_present = TRUE
-       OR manual_override = TRUE
-       OR COALESCE(manual_status, status) <> 'candidate'
+      s.id,
+      s.site_number,
+      ${siteSql.effectiveIgsType} AS igs_type,
+      ${siteSql.effectiveSubtype} AS subtype,
+      ${siteSql.effectiveStatus} AS status,
+      ${siteSql.effectiveName} AS name,
+      ${siteSql.effectiveOwnership} AS ownership,
+      ${siteSql.effectiveAccessControl} AS access_control,
+      ${siteSql.effectiveAccessDescription} AS access_description,
+      ${siteSql.effectiveNaturalBarrier} AS natural_barrier,
+      ${siteSql.effectiveMaintenance} AS maintenance,
+      ${siteSql.effectiveMaintenanceFrequency} AS maintenance_frequency,
+      ${siteSql.effectiveProxHousing} AS prox_housing,
+      ${siteSql.effectiveHiddenGem} AS hidden_gem,
+      ${siteSql.effectiveDangerous} AS dangerous,
+      ${siteSql.effectiveNoisy} AS noisy,
+      ${siteSql.effectiveTooSmall} AS too_small,
+      ${siteSql.effectiveNotes} AS notes,
+      ${siteSql.effectiveArea} AS area_m2,
+      ${siteSql.effectiveGoodOpportunity} AS good_opportunity,
+      s.manual_override
+    FROM sites s
+    WHERE ${siteSql.activeSite}
     ORDER BY site_number
   `)
   const sites = result.rows

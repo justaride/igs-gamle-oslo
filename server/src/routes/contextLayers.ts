@@ -1,9 +1,12 @@
 import { Router } from 'express'
+import { requireEditorToken } from '../auth.js'
+import { asyncHandler, HttpError } from '../http.js'
 import * as contextLayerService from '../services/contextLayerService.js'
+import { parseContextLayerUpsertBody } from '../validation.js'
 
 const router = Router()
 
-router.get('/', async (req, res) => {
+router.get('/', asyncHandler(async (req, res) => {
   const keysParam = typeof req.query.keys === 'string' ? req.query.keys : ''
   const keys = keysParam
     .split(',')
@@ -12,37 +15,35 @@ router.get('/', async (req, res) => {
 
   const layers = await contextLayerService.getContextLayers(keys.length > 0 ? keys : undefined)
   res.json({ layers })
-})
+}))
 
-router.post('/refresh-review-queue', async (_req, res) => {
-  try {
-    await contextLayerService.refreshReviewQueueFromLayers()
-    res.json({ ok: true, message: 'Review queue cache refreshed from current context layers' })
-  } catch (error) {
-    console.error('Failed to refresh review queue cache:', error)
-    res.status(500).json({ error: 'Failed to refresh review queue cache' })
-  }
-})
+router.post('/refresh-review-queue', requireEditorToken, asyncHandler(async (_req, res) => {
+  await contextLayerService.refreshReviewQueueFromLayers()
+  res.json({ ok: true, message: 'Review queue cache refreshed from current context layers' })
+}))
 
-router.put('/:key', async (req, res) => {
-  const { label, category, description, geojson } = req.body
-  if (!label || !category || !geojson) {
-    return res.status(400).json({ error: 'Missing required fields: label, category, geojson' })
+router.put('/:key', requireEditorToken, asyncHandler(async (req, res) => {
+  const layerKey = typeof req.params.key === 'string' ? req.params.key.trim() : ''
+  if (!layerKey) {
+    throw new HttpError(400, 'Layer key is required')
   }
 
-  try {
-    await contextLayerService.upsertContextLayer(req.params.key, { label, category, description, geojson })
-    res.json({ ok: true, key: req.params.key })
-  } catch (error) {
-    console.error('Failed to upsert context layer:', error)
-    res.status(500).json({ error: 'Failed to upsert context layer' })
-  }
-})
+  const payload = parseContextLayerUpsertBody(req.body)
+  await contextLayerService.upsertContextLayer(layerKey, payload)
+  res.json({ ok: true, key: layerKey })
+}))
 
-router.get('/:key', async (req, res) => {
-  const layer = await contextLayerService.getContextLayerByKey(req.params.key)
-  if (!layer) return res.status(404).json({ error: 'Context layer not found' })
+router.get('/:key', asyncHandler(async (req, res) => {
+  const layerKey = typeof req.params.key === 'string' ? req.params.key.trim() : ''
+  if (!layerKey) {
+    throw new HttpError(400, 'Layer key is required')
+  }
+
+  const layer = await contextLayerService.getContextLayerByKey(layerKey)
+  if (!layer) {
+    throw new HttpError(404, 'Context layer not found')
+  }
   res.json(layer)
-})
+}))
 
 export default router
