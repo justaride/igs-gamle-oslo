@@ -166,6 +166,29 @@ export function parseContextLayerUpsertBody(body: unknown) {
   }
 }
 
+export function parseSiteCreateBody(body: unknown) {
+  const payload = ensureObject(body, 'Request body must be a JSON object')
+
+  const geometry = ensureObject(payload.geometry, 'geometry must be an object')
+  const geometryType = parseEnum(geometry.type, 'geometry.type', ['Polygon', 'MultiPolygon'] as const)
+  if (!Array.isArray(geometry.coordinates)) {
+    throw new HttpError(400, 'geometry.coordinates must be an array')
+  }
+
+  const result: Record<string, unknown> = {
+    geometry: { ...geometry, type: geometryType, coordinates: geometry.coordinates },
+    igs_type: parseEnum(payload.igs_type, 'igs_type', IGS_TYPES),
+  }
+
+  if ('subtype' in payload) result.subtype = parseNullableString(payload.subtype, 'subtype')
+  if ('name' in payload) result.name = parseNullableString(payload.name, 'name')
+  if ('ownership' in payload) result.ownership = parseEnum(payload.ownership, 'ownership', OWNERSHIP_VALUES)
+  if ('access_control' in payload) result.access_control = parseEnum(payload.access_control, 'access_control', ACCESS_CONTROL_VALUES)
+  if ('notes' in payload) result.notes = parseNullableString(payload.notes, 'notes')
+
+  return result
+}
+
 export function parseSiteUpdateBody(body: unknown) {
   const payload = ensureObject(body, 'Request body must be a JSON object')
   const updates: Record<string, unknown> = {}

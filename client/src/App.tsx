@@ -1,6 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { type MouseEvent, useEffect } from 'react'
 import { type AppRoute, useAppRouter } from './hooks/useAppRouter'
+import ErrorBoundary from './components/ErrorBoundary'
+import ToastContainer from './components/Toast'
 import MapPage from './pages/MapPage'
 import MapLabPage from './pages/MapLabPage'
 import OverviewPage from './pages/OverviewPage'
@@ -106,7 +108,10 @@ function AppContent() {
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AppContent />
+      <ErrorBoundary>
+        <AppContent />
+        <ToastContainer />
+      </ErrorBoundary>
     </QueryClientProvider>
   )
 }

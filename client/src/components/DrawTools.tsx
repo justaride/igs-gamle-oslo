@@ -9,9 +9,47 @@ import type { SiteCollection } from '../types'
 
 export default function DrawTools() {
   const map = useMap()
-  const { selectedSiteId, editingGeometry, setEditingGeometry, editMode } = useStore()
+  const { selectedSiteId, editingGeometry, setEditingGeometry, editMode, creatingNewSite, setCreatingNewSite, setPendingGeometry } = useStore()
   const updateGeometry = useUpdateSiteGeometry()
   const queryClient = useQueryClient()
+
+  useEffect(() => {
+    if (!creatingNewSite) return
+
+    const drawnItems = new L.FeatureGroup()
+    map.addLayer(drawnItems)
+
+    const drawControl = new L.Control.Draw({
+      draw: {
+        polygon: { allowIntersection: false, showArea: true },
+        polyline: false,
+        rectangle: false,
+        circle: false,
+        circlemarker: false,
+        marker: false,
+      },
+      edit: { featureGroup: drawnItems },
+    })
+    map.addControl(drawControl)
+
+    const onCreated = (e: L.DrawEvents.Created) => {
+      const layer = e.layer
+      const geojson = (layer as L.Polygon).toGeoJSON()
+      const geom = geojson.geometry
+      const multiGeom: GeoJSON.MultiPolygon = geom.type === 'Polygon'
+        ? { type: 'MultiPolygon', coordinates: [geom.coordinates as GeoJSON.Position[][]] }
+        : geom as GeoJSON.MultiPolygon
+      setPendingGeometry(multiGeom)
+    }
+
+    map.on(L.Draw.Event.CREATED, onCreated as L.LeafletEventHandlerFn)
+
+    return () => {
+      map.removeControl(drawControl)
+      map.removeLayer(drawnItems)
+      map.off(L.Draw.Event.CREATED, onCreated as L.LeafletEventHandlerFn)
+    }
+  }, [creatingNewSite])
 
   useEffect(() => {
     if (!editingGeometry || !selectedSiteId) return

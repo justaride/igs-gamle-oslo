@@ -22,6 +22,10 @@ type Store = {
   setEditingGeometry: (v: boolean) => void
   editMode: EditMode
   setEditMode: (mode: EditMode) => void
+  creatingNewSite: boolean
+  setCreatingNewSite: (v: boolean) => void
+  pendingGeometry: GeoJSON.MultiPolygon | null
+  setPendingGeometry: (g: GeoJSON.MultiPolygon | null) => void
   statusFilter: StatusFilter
   setStatusFilter: (f: StatusFilter) => void
   searchQuery: string
@@ -47,6 +51,10 @@ export const useStore = create<Store>((set) => ({
   setEditingGeometry: (v) => set({ editingGeometry: v }),
   editMode: 'reshape',
   setEditMode: (mode) => set({ editMode: mode }),
+  creatingNewSite: false,
+  setCreatingNewSite: (v) => set({ creatingNewSite: v, selectedSiteId: null, editingGeometry: false, pendingGeometry: null }),
+  pendingGeometry: null,
+  setPendingGeometry: (g) => set({ pendingGeometry: g }),
   statusFilter: 'all',
   setStatusFilter: (f) => set({ statusFilter: f }),
   searchQuery: '',

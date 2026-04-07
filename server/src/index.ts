@@ -9,6 +9,7 @@ import speciesRouter from './routes/species.js'
 import parksRouter from './routes/parks.js'
 import contextLayersRouter from './routes/contextLayers.js'
 import exportRouter from './routes/exportRoute.js'
+import authRouter from './routes/auth.js'
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -26,6 +27,7 @@ app.use('/api/species', speciesRouter)
 app.use('/api/parks', parksRouter)
 app.use('/api/context-layers', contextLayersRouter)
 app.use('/api/export', exportRouter)
+app.use('/api/auth', authRouter)
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' })

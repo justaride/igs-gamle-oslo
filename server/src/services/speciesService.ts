@@ -19,6 +19,34 @@ export async function getSpeciesBySite(siteId: number) {
   return result.rows
 }
 
+export async function createObservation(data: {
+  siteId: number
+  scientificName: string
+  vernacularName?: string | null
+  observationCount: number
+  latitude: number
+  longitude: number
+}) {
+  const result = await query(
+    `INSERT INTO species_observations (
+      site_id, scientific_name, vernacular_name,
+      observation_count, geom
+    ) VALUES (
+      $1, $2, $3, $4,
+      ST_SetSRID(ST_MakePoint($5, $6), 4326)
+    ) RETURNING id`,
+    [
+      data.siteId,
+      data.scientificName,
+      data.vernacularName ?? null,
+      data.observationCount,
+      data.longitude,
+      data.latitude,
+    ]
+  )
+  return result.rows[0]
+}
+
 export async function getAllSpeciesAsGeoJSON() {
   const result = await query(`
     SELECT json_build_object(

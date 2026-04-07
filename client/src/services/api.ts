@@ -42,6 +42,13 @@ export const api = {
 
   getSite: (id: number) => fetchJSON(`/sites/${id}`),
 
+  createSite: (data: Record<string, unknown>) =>
+    fetchJSON('/sites', {
+      method: 'POST',
+      headers: buildHeaders(undefined, true),
+      body: JSON.stringify(data),
+    }),
+
   updateSite: (id: number, fields: Record<string, unknown>) =>
     fetchJSON(`/sites/${id}`, {
       method: 'PATCH',
@@ -63,10 +70,32 @@ export const api = {
       body: JSON.stringify({ status }),
     }),
 
+  bulkUpdateStatus: (siteIds: number[], status: string) =>
+    fetchJSON('/sites/bulk-status', {
+      method: 'POST',
+      headers: buildHeaders(undefined, true),
+      body: JSON.stringify({ siteIds, status }),
+    }),
+
+  refreshReviewQueue: () =>
+    fetchJSON('/context-layers/refresh-review-queue', {
+      method: 'POST',
+      headers: buildHeaders(undefined, true),
+    }),
+
   resetSiteOverrides: (id: number) =>
     fetchJSON(`/sites/${id}/reset-overrides`, {
       method: 'POST',
       headers: buildHeaders(undefined, true),
+    }),
+
+  getSiteChanges: (id: number) => fetchJSON(`/sites/${id}/changes`),
+
+  createSpeciesObservation: (data: Record<string, unknown>) =>
+    fetchJSON('/species', {
+      method: 'POST',
+      headers: buildHeaders(undefined, true),
+      body: JSON.stringify(data),
     }),
 
   getSpecies: () => fetchJSON('/species'),
@@ -82,8 +111,9 @@ export const api = {
     return fetchJSON(`/context-layers${query}`)
   },
 
-  downloadExcel: async () => {
-    const res = await fetch(`${BASE}/export/excel`)
+  downloadExcel: async (status?: string) => {
+    const query = status && status !== 'all' ? `?status=${status}` : ''
+    const res = await fetch(`${BASE}/export/excel${query}`)
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -91,6 +121,33 @@ export const api = {
     a.download = 'IGS_Assessment_GamleOslo.xlsx'
     a.click()
     URL.revokeObjectURL(url)
+  },
+
+  downloadGeoJSON: async (status?: string) => {
+    const query = status && status !== 'all' ? `?status=${status}` : ''
+    const res = await fetch(`${BASE}/export/geojson${query}`)
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'IGS_GamleOslo.geojson'
+    a.click()
+    URL.revokeObjectURL(url)
+  },
+
+  verifyToken: async (): Promise<boolean> => {
+    try {
+      const res = await fetch(`${BASE}/auth/verify`, {
+        headers: buildHeaders(undefined, true),
+      })
+      return res.ok
+    } catch {
+      return false
+    }
+  },
+
+  hasEditorToken: (): boolean => {
+    return !!getEditorToken()
   },
 
   setEditorToken: (token: string) => {

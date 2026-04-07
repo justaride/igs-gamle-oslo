@@ -4,7 +4,14 @@ import { buildSiteSql } from './siteSql.js'
 
 const siteSql = buildSiteSql('s')
 
-export async function generateExcel(): Promise<ExcelJS.Workbook> {
+export async function generateExcel(statusFilter?: string[]): Promise<ExcelJS.Workbook> {
+  const params: unknown[] = []
+  let statusClause = ''
+  if (statusFilter && statusFilter.length > 0) {
+    params.push(statusFilter)
+    statusClause = `AND (${siteSql.effectiveStatus}) = ANY($1::text[])`
+  }
+
   const result = await query(`
     SELECT
       s.id,
@@ -30,8 +37,9 @@ export async function generateExcel(): Promise<ExcelJS.Workbook> {
       s.manual_override
     FROM sites s
     WHERE ${siteSql.activeSite}
+    ${statusClause}
     ORDER BY site_number
-  `)
+  `, params)
   const sites = result.rows
 
   const wb = new ExcelJS.Workbook()

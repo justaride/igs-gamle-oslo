@@ -1,5 +1,6 @@
 import pool, { query } from '../db.js'
 import { buildSiteSql } from './siteSql.js'
+import { recordChanges, getChangeHistory } from './auditService.js'
 
 const REVIEW_QUEUE_LAYER_KEYS = [
   'steep_slopes',
@@ -493,6 +494,74 @@ async function refreshReviewQueueCacheForSite(id: number, reason = 'site_updated
   }
 }
 
+export async function createSite(fields: Record<string, unknown>) {
+  const geometry = fields.geometry as { type: string; coordinates: unknown[] }
+  const geojsonStr = JSON.stringify(geometry)
+
+  const nextNumberResult = await query(
+    `SELECT COALESCE(MAX(CAST(SUBSTRING(site_number FROM 5) AS INTEGER)), 0) + 1 AS next_num FROM sites`
+  )
+  const nextNum = nextNumberResult.rows[0].next_num
+  const siteNumber = `IGS-${String(nextNum).padStart(3, '0')}`
+
+  const result = await query(
+    `INSERT INTO sites (
+      site_number,
+      geom,
+      manual_geometry,
+      igs_type,
+      manual_igs_type,
+      subtype,
+      manual_subtype,
+      name,
+      manual_name,
+      status,
+      manual_status,
+      ownership,
+      manual_ownership,
+      access_control,
+      manual_access_control,
+      notes,
+      manual_notes,
+      area_m2,
+      source_run_id,
+      source_present,
+      manual_override,
+      updated_at
+    ) VALUES (
+      $1,
+      ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON($2), 4326)),
+      ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON($2), 4326)),
+      $3, $3,
+      $4, $4,
+      $5, $5,
+      'candidate', 'candidate',
+      $6, $6,
+      $7, $7,
+      $8, $8,
+      ST_Area(ST_Transform(ST_SetSRID(ST_GeomFromGeoJSON($2), 4326), 25833)),
+      'manual',
+      TRUE,
+      TRUE,
+      NOW()
+    ) RETURNING id`,
+    [
+      siteNumber,
+      geojsonStr,
+      fields.igs_type,
+      fields.subtype ?? null,
+      fields.name ?? null,
+      fields.ownership ?? 'UNK',
+      fields.access_control ?? 'O',
+      fields.notes ?? null,
+    ]
+  )
+
+  const newId = result.rows[0].id
+  await refreshReviewQueueCacheForSite(newId, 'site_created')
+  return getSiteById(newId)
+}
+
 export async function getAllSites() {
   const result = await query(`
     SELECT json_build_object(
@@ -555,6 +624,14 @@ export async function updateSite(id: number, fields: Record<string, unknown>) {
 
   if (updates.length === 0) return null
 
+  const oldResult = await query(
+    `SELECT ${Object.values(columnMap).filter((col) => {
+      return Object.entries(columnMap).some(([key, c]) => c === col && key in fields)
+    }).join(', ')} FROM sites WHERE id = $1`,
+    [id]
+  )
+  const oldValues = oldResult.rows[0] ?? {}
+
   updates.push('manual_override = TRUE')
 
   updates.push(`updated_at = NOW()`)
@@ -566,6 +643,15 @@ export async function updateSite(id: number, fields: Record<string, unknown>) {
   )
 
   if (result.rows[0]) {
+    const auditOld: Record<string, unknown> = {}
+    const auditNew: Record<string, unknown> = {}
+    for (const [key, col] of Object.entries(columnMap)) {
+      if (key in fields) {
+        auditOld[key] = oldValues[col]
+        auditNew[key] = fields[key]
+      }
+    }
+    await recordChanges(id, auditOld, auditNew)
     await refreshReviewQueueCacheForSite(id, 'site_updated')
   }
 
@@ -582,6 +668,7 @@ export async function updateSiteGeometry(id: number, geojson: object) {
   )
 
   if (result.rows[0]) {
+    await recordChanges(id, {}, { geometry: 'oppdatert' })
     await refreshReviewQueueCacheForSite(id, 'site_geometry_updated')
   }
 
@@ -589,6 +676,9 @@ export async function updateSiteGeometry(id: number, geojson: object) {
 }
 
 export async function updateSiteStatus(id: number, status: string) {
+  const oldResult = await query(`SELECT manual_status, status FROM sites WHERE id = $1`, [id])
+  const oldStatus = oldResult.rows[0]?.manual_status ?? oldResult.rows[0]?.status
+
   const result = await query(
     `UPDATE sites
      SET manual_status = $1,
@@ -603,6 +693,7 @@ export async function updateSiteStatus(id: number, status: string) {
   )
 
   if (result.rows[0]) {
+    await recordChanges(id, { status: oldStatus }, { status })
     await refreshReviewQueueCacheForSite(id, 'site_status_updated')
   }
 

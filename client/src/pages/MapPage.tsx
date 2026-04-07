@@ -1,11 +1,15 @@
+import { useState, useCallback } from 'react'
 import Map from '../components/Map'
 import ReviewQueuePanel from '../components/ReviewQueuePanel'
 import SiteSidebar from '../components/SiteSidebar'
 import ExportButton from '../components/ExportButton'
 import SiteSearch from '../components/SiteSearch'
+import LoginDialog from '../components/LoginDialog'
+import SiteCreateForm from '../components/SiteCreateForm'
 import { useStore } from '../hooks/useStore'
 import { useSites } from '../hooks/useSites'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
+import { api } from '../services/api'
 import type { SiteStatus } from '../types'
 
 const STATUS_FILTERS: { value: 'all' | SiteStatus; label: string }[] = [
@@ -45,8 +49,16 @@ function StatusFilterPills() {
 }
 
 export default function MapPage() {
-  const { selectedSiteId, editingGeometry, setEditingGeometry, editMode, setEditMode } = useStore()
+  const { selectedSiteId, editingGeometry, setEditingGeometry, editMode, setEditMode, creatingNewSite, setCreatingNewSite } = useStore()
   useKeyboardShortcuts()
+
+  const [showLogin, setShowLogin] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(api.hasEditorToken())
+
+  const handleLogout = useCallback(() => {
+    api.clearEditorToken()
+    setIsAuthenticated(false)
+  }, [])
 
   const startEdit = (mode: 'reshape' | 'redraw') => {
     setEditMode(mode)
@@ -65,7 +77,17 @@ export default function MapPage() {
         <SiteSearch />
         <StatusFilterPills />
         <div className="header-actions">
-          {selectedSiteId && !editingGeometry && (
+          {isAuthenticated && !selectedSiteId && !editingGeometry && !creatingNewSite && (
+            <button className="btn" onClick={() => setCreatingNewSite(true)}>
+              Nytt område
+            </button>
+          )}
+          {creatingNewSite && (
+            <button className="btn btn-active" onClick={() => setCreatingNewSite(false)}>
+              Avbryt tegning
+            </button>
+          )}
+          {isAuthenticated && selectedSiteId && !editingGeometry && !creatingNewSite && (
             <>
               <button className="btn" onClick={() => startEdit('reshape')}>
                 Rediger grense
@@ -81,14 +103,32 @@ export default function MapPage() {
             </button>
           )}
           <ExportButton />
+          {isAuthenticated ? (
+            <button className="btn btn-secondary" onClick={handleLogout}>
+              Logg ut
+            </button>
+          ) : (
+            <button className="btn" onClick={() => setShowLogin(true)}>
+              Logg inn
+            </button>
+          )}
         </div>
       </header>
       <div className="app-body">
         <div className="map-container">
           <Map />
         </div>
-        {selectedSiteId ? <SiteSidebar /> : <ReviewQueuePanel />}
+        {creatingNewSite ? <SiteCreateForm /> : selectedSiteId ? <SiteSidebar /> : <ReviewQueuePanel />}
       </div>
+      {showLogin && (
+        <LoginDialog
+          onClose={() => setShowLogin(false)}
+          onSuccess={() => {
+            setShowLogin(false)
+            setIsAuthenticated(true)
+          }}
+        />
+      )}
     </div>
   )
 }

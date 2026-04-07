@@ -1,12 +1,23 @@
 import { useState } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useReviewQueue } from '../hooks/useReviewQueue'
 import { useStore } from '../hooks/useStore'
 import { useSites } from '../hooks/useSites'
+import { useToastStore } from '../hooks/useToast'
 import { formatArea, formatNumber } from '../lib/dashboardMetrics'
 import { getReviewQueueStaleMessage } from '../lib/reviewQueueMeta'
 import { STATUS_LABELS, type ReviewQueueItem } from '../types'
+import { api } from '../services/api'
 
 const PAGE_SIZE = 20
+
+const SCORE_EXPLANATION = `Poeng basert på overlapp med QA-lag:
+  Bratt terreng: +3
+  Geo-edgeland: +3
+  Residual infrastruktur: +2
+  Farlig: +2
+  Støy: +1
+  For lite: +1`
 
 function formatOverlapShare(value: number) {
   return new Intl.NumberFormat('nb-NO', {
@@ -15,10 +26,12 @@ function formatOverlapShare(value: number) {
   }).format(value)
 }
 
-function QueueItem({ item, isActive, onSelect }: {
+function QueueItem({ item, isActive, onSelect, checked, onToggle }: {
   item: ReviewQueueItem
   isActive: boolean
   onSelect: () => void
+  checked: boolean
+  onToggle: () => void
 }) {
   const overlapSummary = [
     item.overlaps.steepSlopesM2 > 0
@@ -38,23 +51,31 @@ function QueueItem({ item, isActive, onSelect }: {
     .join(' \u2022 ')
 
   return (
-    <button
-      className={`review-queue-item ${isActive ? 'review-queue-item-active' : ''}`}
-      onClick={onSelect}
-    >
-      <div className="review-queue-item-head">
-        <strong>{item.siteNumber}</strong>
-        <span className="review-queue-score-chip">Score {item.score}</span>
-      </div>
-      <div className="review-queue-item-meta">
-        <span>{item.igsType}</span>
-        <span>{STATUS_LABELS[item.status]}</span>
-        <span>{formatArea(item.areaM2 ?? 0)}</span>
-        <span>{formatOverlapShare(item.maxOverlapRatio)}</span>
-      </div>
-      <p>{item.reasons.join(' \u2022 ')}</p>
-      {overlapSummary ? <small>{overlapSummary}</small> : null}
-    </button>
+    <div className={`review-queue-item ${isActive ? 'review-queue-item-active' : ''}`}>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={onToggle}
+        className="review-queue-checkbox"
+        onClick={(e) => e.stopPropagation()}
+      />
+      <button className="review-queue-item-btn" onClick={onSelect}>
+        <div className="review-queue-item-head">
+          <strong>{item.siteNumber}</strong>
+          <span className="review-queue-score-chip" title={SCORE_EXPLANATION}>
+            Score {item.score}
+          </span>
+        </div>
+        <div className="review-queue-item-meta">
+          <span>{item.igsType}</span>
+          <span>{STATUS_LABELS[item.status]}</span>
+          <span>{formatArea(item.areaM2 ?? 0)}</span>
+          <span>{formatOverlapShare(item.maxOverlapRatio)}</span>
+        </div>
+        <p>{item.reasons.join(' \u2022 ')}</p>
+        {overlapSummary ? <small>{overlapSummary}</small> : null}
+      </button>
+    </div>
   )
 }
 
@@ -63,6 +84,31 @@ export default function ReviewQueuePanel() {
   const { data: sites } = useSites()
   const { data: reviewQueueResponse, isLoading, isError } = useReviewQueue()
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const qc = useQueryClient()
+  const addToast = useToastStore((s) => s.addToast)
+
+  const bulkStatus = useMutation({
+    mutationFn: async ({ ids, status }: { ids: number[]; status: string }) => {
+      await api.bulkUpdateStatus(ids, status)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['sites'] })
+      qc.invalidateQueries({ queryKey: ['review-queue'] })
+      setSelectedIds(new Set())
+      addToast('Bulk-oppdatering fullført', 'success')
+    },
+    onError: () => addToast('Bulk-oppdatering feilet', 'error'),
+  })
+
+  const refreshQueue = useMutation({
+    mutationFn: () => api.refreshReviewQueue(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['review-queue'] })
+      addToast('Revisjonskø oppdatert', 'success')
+    },
+    onError: () => addToast('Oppdatering feilet', 'error'),
+  })
 
   const allItems = reviewQueueResponse?.items ?? []
   const staleMessage = getReviewQueueStaleMessage(reviewQueueResponse?.meta)
@@ -80,6 +126,15 @@ export default function ReviewQueuePanel() {
     setFlyToSiteId(id)
   }
 
+  const toggleId = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
   return (
     <div className="sidebar review-queue-panel">
       <div className="review-queue-header">
@@ -89,7 +144,38 @@ export default function ReviewQueuePanel() {
       <p className="review-queue-desc">
         Prioritert etter overlapp mot QA-lag. Klikk for å velge et sted i kartet.
       </p>
-      {staleMessage ? <div className="inline-notice">{staleMessage}</div> : null}
+      {staleMessage && (
+        <div className="inline-notice">
+          {staleMessage}
+          <button
+            className="btn btn-secondary"
+            style={{ marginLeft: 8, padding: '2px 8px', fontSize: 12 }}
+            onClick={() => refreshQueue.mutate()}
+            disabled={refreshQueue.isPending}
+          >
+            {refreshQueue.isPending ? 'Oppdaterer...' : 'Oppdater nå'}
+          </button>
+        </div>
+      )}
+      {selectedIds.size > 0 && (
+        <div className="review-queue-bulk-actions">
+          <span>{selectedIds.size} valgt</span>
+          <button
+            className="btn btn-validate"
+            onClick={() => bulkStatus.mutate({ ids: [...selectedIds], status: 'validated' })}
+            disabled={bulkStatus.isPending}
+          >
+            Valider valgte
+          </button>
+          <button
+            className="btn btn-reject"
+            onClick={() => bulkStatus.mutate({ ids: [...selectedIds], status: 'rejected' })}
+            disabled={bulkStatus.isPending}
+          >
+            Avvis valgte
+          </button>
+        </div>
+      )}
       {visibleItems.length > 0 ? (
         <div className="review-queue-list">
           {visibleItems.map((item) => (
@@ -98,6 +184,8 @@ export default function ReviewQueuePanel() {
               item={item}
               isActive={selectedSiteId === item.id}
               onSelect={() => handleSelect(item.id)}
+              checked={selectedIds.has(item.id)}
+              onToggle={() => toggleId(item.id)}
             />
           ))}
           {visibleCount < filteredItems.length && (

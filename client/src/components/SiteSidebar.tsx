@@ -5,6 +5,7 @@ import { STATUS_LABELS, IGS_COLORS } from '../types'
 import type { SiteFeature } from '../types'
 import SiteEditForm from './SiteEditForm'
 import SpeciesPanel from './SpeciesPanel'
+import ChangeHistory from './ChangeHistory'
 
 function formatReviewedAt(value: string | null | undefined) {
   if (!value) {
@@ -157,6 +158,7 @@ export default function SiteSidebar() {
 
       <SiteEditForm feature={feature} />
       <SpeciesPanel siteId={p.id} />
+      <ChangeHistory siteId={p.id} />
     </div>
   )
 }
