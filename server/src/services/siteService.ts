@@ -283,6 +283,10 @@ export async function getAllSites() {
     ) AS geojson
     FROM sites s
     WHERE ${ACTIVE_SITE_SQL}
+      AND NOT (
+        ${EFFECTIVE_IGS_TYPE_SQL} = 'Edgeland'
+        AND ${EFFECTIVE_SUBTYPE_SQL} IN ('Bio', 'Geo')
+      )
   `)
   return result.rows[0].geojson
 }
