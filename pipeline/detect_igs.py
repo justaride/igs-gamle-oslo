@@ -114,6 +114,26 @@ def detect_residual(data):
         residual = subtract_gdf(residual, road_surface)
         print(f'  After removing road surfaces: {len(residual)}')
 
+    # Exclude rail yards (ballast/concrete/platforms between tracks) from Residual IGS.
+    landuse = data.get('landuse')
+    if landuse is not None and 'landuse' in landuse.columns:
+        rail_yards = landuse[landuse['landuse'] == 'railway']
+        if len(rail_yards) > 0:
+            residual = subtract_gdf(residual, rail_yards[['geometry']])
+            print(f'  After removing railway yards: {len(residual)}')
+
+    if len(railways) > 0 and 'railway' in railways.columns:
+        rail_polys = railways[
+            railways.geometry.type.isin(['Polygon', 'MultiPolygon'])
+            & railways['railway'].isin([
+                'platform', 'station', 'yard', 'siding',
+                'turntable', 'depot', 'tram_stop'
+            ])
+        ]
+        if len(rail_polys) > 0:
+            residual = subtract_gdf(residual, rail_polys[['geometry']])
+            print(f'  After removing railway infrastructure polygons: {len(residual)}')
+
     residual = to_polygons_gdf(residual, MIN_AREA_RESIDUAL_M2)
     residual['igs_type'] = 'Residual'
     if '_subtype' in residual.columns:
@@ -148,8 +168,8 @@ def detect_lot(data):
         columns=['geometry', 'igs_type', 'subtype'], crs=CRS_UTM
     )
 
-def detect_edgelands(data, steep_slopes=None):
-    print('Detecting Edgelands...')
+def detect_edgelands(data):
+    print('Detecting Edgelands (Hydro only)...')
     results = []
 
     waterways = data['waterways']
@@ -171,54 +191,6 @@ def detect_edgelands(data, steep_slopes=None):
                 'subtype': 'Hydro',
             })
         print(f'  Hydro edges: {len(hydro)}')
-
-    natural = data.get('natural')
-    if natural is not None and len(natural) > 0 and 'natural' in natural.columns:
-        woods = natural[natural['natural'].isin(['wood', 'scrub', 'heath'])]
-        landuse = data.get('landuse')
-        if len(woods) > 0 and landuse is not None and 'landuse' in landuse.columns:
-            residential = landuse[landuse['landuse'] == 'residential']
-            if len(residential) > 0:
-                woods_buf = woods.copy()
-                woods_buf['geometry'] = woods_buf.geometry.buffer(30)
-                woods_buf = woods_buf[woods_buf.geometry.type.isin(['Polygon', 'MultiPolygon'])]
-
-                res_buf = residential.copy()
-                res_buf['geometry'] = res_buf.geometry.buffer(30)
-                res_buf = res_buf[res_buf.geometry.type.isin(['Polygon', 'MultiPolygon'])]
-
-                try:
-                    bio_edge = gpd.overlay(
-                        gpd.GeoDataFrame(woods_buf[['geometry']], crs=CRS_UTM),
-                        gpd.GeoDataFrame(res_buf[['geometry']], crs=CRS_UTM),
-                        how='intersection'
-                    )
-                    bio_edge = subtract_gdf(bio_edge, buildings, buffer_m=2)
-                    bio_edge = to_polygons_gdf(bio_edge, MIN_AREA_EDGELAND_M2)
-
-                    for _, row in bio_edge.iterrows():
-                        results.append({
-                            'geometry': row.geometry,
-                            'igs_type': 'Edgeland',
-                            'subtype': 'Bio',
-                        })
-                    print(f'  Bio edges: {len(bio_edge)}')
-                except Exception as e:
-                    print(f'  Bio edge detection failed: {e}')
-
-    if steep_slopes is not None and len(steep_slopes) > 0:
-        geo_edge = subtract_gdf(
-            gpd.GeoDataFrame(steep_slopes[['geometry']], crs=CRS_UTM),
-            buildings, buffer_m=2
-        )
-        geo_edge = to_polygons_gdf(geo_edge, MIN_AREA_EDGELAND_M2)
-        for _, row in geo_edge.iterrows():
-            results.append({
-                'geometry': row.geometry,
-                'igs_type': 'Edgeland',
-                'subtype': 'Geo',
-            })
-        print(f'  Geo edges: {len(geo_edge)}')
 
     print(f'  Found {len(results)} Edgeland candidates total')
     return gpd.GeoDataFrame(results, crs=CRS_UTM) if results else gpd.GeoDataFrame(
@@ -267,7 +239,7 @@ def detect_opportunity(data):
 def detect_all(data, steep_slopes=None):
     residual = detect_residual(data)
     lot = detect_lot(data)
-    edgelands = detect_edgelands(data, steep_slopes)
+    edgelands = detect_edgelands(data)
     opportunity = detect_opportunity(data)
 
     all_igs = pd.concat([residual, lot, edgelands, opportunity], ignore_index=True)

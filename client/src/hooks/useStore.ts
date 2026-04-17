@@ -43,7 +43,7 @@ export const useStore = create<Store>((set) => ({
     Edgeland: true,
     Opportunity: true,
     parks: true,
-    species: true,
+    species: false,
   },
   toggleLayer: (layer) =>
     set((s) => ({ layers: { ...s.layers, [layer]: !s.layers[layer] } })),
