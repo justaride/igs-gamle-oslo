@@ -21,11 +21,18 @@ function timingSafeEqual(left: string, right: string) {
   return crypto.timingSafeEqual(leftBuffer, rightBuffer)
 }
 
-export function buildCorsOptions(): CorsOptions | null {
+export function buildCorsOptions(): CorsOptions {
   const allowedOrigins = parseAllowedOrigins()
 
   if (allowedOrigins.length === 0) {
-    return null
+    if (process.env.NODE_ENV === 'production') {
+      return {
+        origin(_origin, callback) {
+          callback(new HttpError(403, 'CORS is not configured for this deployment'))
+        },
+      }
+    }
+    return { origin: true }
   }
 
   return {

@@ -49,7 +49,7 @@ function StatusFilterPills() {
 }
 
 export default function MapPage() {
-  const { selectedSiteId, editingGeometry, setEditingGeometry, editMode, setEditMode, creatingNewSite, setCreatingNewSite } = useStore()
+  const { selectedSiteId, editingGeometry, editMode, setEditMode, setEditingGeometry, requestSaveAndExit, creatingNewSite, setCreatingNewSite } = useStore()
   useKeyboardShortcuts()
 
   const [showLogin, setShowLogin] = useState(false)
@@ -98,7 +98,7 @@ export default function MapPage() {
             </>
           )}
           {editingGeometry && (
-            <button className="btn btn-active" onClick={() => setEditingGeometry(false)}>
+            <button className="btn btn-active" onClick={() => requestSaveAndExit()}>
               Avslutt {editMode === 'reshape' ? 'redigering' : 'tegning'}
             </button>
           )}

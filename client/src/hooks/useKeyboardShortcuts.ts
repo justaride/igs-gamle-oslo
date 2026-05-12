@@ -3,7 +3,7 @@ import { useStore } from './useStore'
 import { useSites, useUpdateSiteStatus } from './useSites'
 
 export function useKeyboardShortcuts() {
-  const { selectedSiteId, selectSite, setEditingGeometry, setFlyToSiteId } = useStore()
+  const { selectedSiteId, selectSite, setFlyToSiteId } = useStore()
   const { data: sites } = useSites()
   const updateStatus = useUpdateSiteStatus()
 
@@ -13,8 +13,14 @@ export function useKeyboardShortcuts() {
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
 
       if (e.key === 'Escape') {
-        setEditingGeometry(false)
-        selectSite(null)
+        const state = useStore.getState()
+        if (state.editingGeometry) {
+          state.requestSaveAndExit()
+        } else if (state.creatingNewSite) {
+          state.setCreatingNewSite(false)
+        } else {
+          selectSite(null)
+        }
         return
       }
 

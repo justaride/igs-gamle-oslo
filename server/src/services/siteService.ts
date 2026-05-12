@@ -1,6 +1,29 @@
 import pool, { query } from '../db.js'
+import { HttpError } from '../http.js'
 import { buildSiteSql } from './siteSql.js'
 import { recordChanges, getChangeHistory } from './auditService.js'
+
+function isPostGISGeometryError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+  const msg = error.message.toLowerCase()
+  return (
+    msg.includes('topology') ||
+    msg.includes('self-intersection') ||
+    msg.includes('invalid geojson') ||
+    msg.includes('geomfromgeojson') ||
+    msg.includes('invalid coordinate') ||
+    msg.includes('lwgeom') ||
+    msg.includes('geos')
+  )
+}
+
+function extractGeometryErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    const match = error.message.match(/(?:ERROR:\s*)?(.+?)(?:\s*CONTEXT:|$)/i)
+    return match?.[1]?.trim() ?? error.message
+  }
+  return 'Unknown geometry error'
+}
 
 const REVIEW_QUEUE_LAYER_KEYS = [
   'steep_slopes',
@@ -504,7 +527,9 @@ export async function createSite(fields: Record<string, unknown>) {
   const nextNum = nextNumberResult.rows[0].next_num
   const siteNumber = `IGS-${String(nextNum).padStart(3, '0')}`
 
-  const result = await query(
+  let result
+  try {
+    result = await query(
     `INSERT INTO sites (
       site_number,
       geom,
@@ -556,6 +581,12 @@ export async function createSite(fields: Record<string, unknown>) {
       fields.notes ?? null,
     ]
   )
+  } catch (error) {
+    if (isPostGISGeometryError(error)) {
+      throw new HttpError(400, `Invalid geometry: ${extractGeometryErrorMessage(error)}`)
+    }
+    throw error
+  }
 
   const newId = result.rows[0].id
   await refreshReviewQueueCacheForSite(newId, 'site_created')
@@ -659,13 +690,23 @@ export async function updateSite(id: number, fields: Record<string, unknown>) {
 }
 
 export async function updateSiteGeometry(id: number, geojson: object) {
-  const result = await query(
-    `UPDATE sites SET manual_geometry = ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON($1), 4326)),
-     manual_override = TRUE,
-     updated_at = NOW()
-     WHERE id = $2 RETURNING id`,
-    [JSON.stringify(geojson), id]
-  )
+  let result
+  try {
+    result = await query(
+      `UPDATE sites SET
+        manual_geometry = ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON($1), 4326)),
+        area_m2 = ST_Area(ST_Transform(ST_SetSRID(ST_GeomFromGeoJSON($1), 4326), 25833)),
+        manual_override = TRUE,
+        updated_at = NOW()
+       WHERE id = $2 RETURNING id`,
+      [JSON.stringify(geojson), id]
+    )
+  } catch (error) {
+    if (isPostGISGeometryError(error)) {
+      throw new HttpError(400, `Invalid geometry: ${extractGeometryErrorMessage(error)}`)
+    }
+    throw error
+  }
 
   if (result.rows[0]) {
     await recordChanges(id, {}, { geometry: 'oppdatert' })

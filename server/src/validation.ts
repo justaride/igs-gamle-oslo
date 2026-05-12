@@ -128,14 +128,81 @@ export function parseSiteStatusBody(body: unknown): SiteStatus {
   return parseEnum(payload.status, 'status', SITE_STATUSES) as SiteStatus
 }
 
+function isPosition(value: unknown): value is number[] {
+  if (!Array.isArray(value) || value.length < 2 || value.length > 3) return false
+  return value.every((v) => typeof v === 'number' && Number.isFinite(v))
+}
+
+function validatePosition(pos: unknown, path: string) {
+  if (!isPosition(pos)) {
+    throw new HttpError(400, `${path} must be an array of 2 or 3 finite numbers`)
+  }
+
+  const [lng, lat] = pos
+  if (lng < -180 || lng > 180) {
+    throw new HttpError(400, `${path}[0] (longitude) must be between -180 and 180, got ${lng}`)
+  }
+  if (lat < -90 || lat > 90) {
+    throw new HttpError(400, `${path}[1] (latitude) must be between -90 and 90, got ${lat}`)
+  }
+}
+
+function validateLinearRing(ring: unknown, path: string) {
+  if (!Array.isArray(ring)) {
+    throw new HttpError(400, `${path} must be an array of positions`)
+  }
+
+  if (ring.length < 4) {
+    throw new HttpError(400, `${path} must have at least 4 positions, got ${ring.length}`)
+  }
+
+  for (let i = 0; i < ring.length; i++) {
+    validatePosition(ring[i], `${path}[${i}]`)
+  }
+
+  const first = ring[0] as number[]
+  const last = ring[ring.length - 1] as number[]
+  if (first[0] !== last[0] || first[1] !== last[1]) {
+    throw new HttpError(400, `${path} must be closed (first position must equal last position)`)
+  }
+}
+
+function validatePolygonCoordinates(coords: unknown, path: string) {
+  if (!Array.isArray(coords) || coords.length === 0) {
+    throw new HttpError(400, `${path} must be a non-empty array of linear rings`)
+  }
+
+  for (let i = 0; i < coords.length; i++) {
+    validateLinearRing(coords[i], `${path}[${i}]`)
+  }
+}
+
+function validateGeometry(geometry: Record<string, unknown>) {
+  const type = geometry.type as string
+  const coords = geometry.coordinates
+
+  if (!Array.isArray(coords)) {
+    throw new HttpError(400, 'geometry.coordinates must be an array')
+  }
+
+  if (type === 'Polygon') {
+    validatePolygonCoordinates(coords, 'geometry.coordinates')
+  } else if (type === 'MultiPolygon') {
+    if (coords.length === 0) {
+      throw new HttpError(400, 'geometry.coordinates must be a non-empty array of polygons')
+    }
+    for (let i = 0; i < coords.length; i++) {
+      validatePolygonCoordinates(coords[i], `geometry.coordinates[${i}]`)
+    }
+  }
+}
+
 export function parseGeometryPatchBody(body: unknown) {
   const payload = ensureObject(body, 'Request body must be a JSON object')
   const geometry = ensureObject(payload.geometry, 'geometry must be an object')
   const geometryType = parseEnum(geometry.type, 'geometry.type', ['Polygon', 'MultiPolygon'] as const)
 
-  if (!Array.isArray(geometry.coordinates)) {
-    throw new HttpError(400, 'geometry.coordinates must be an array')
-  }
+  validateGeometry({ ...geometry, type: geometryType })
 
   return {
     geometry: {
@@ -174,6 +241,8 @@ export function parseSiteCreateBody(body: unknown) {
   if (!Array.isArray(geometry.coordinates)) {
     throw new HttpError(400, 'geometry.coordinates must be an array')
   }
+
+  validateGeometry({ ...geometry, type: geometryType })
 
   const result: Record<string, unknown> = {
     geometry: { ...geometry, type: geometryType, coordinates: geometry.coordinates },

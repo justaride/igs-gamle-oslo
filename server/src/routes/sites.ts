@@ -81,6 +81,9 @@ router.post('/bulk-status', requireEditorToken, asyncHandler(async (req, res) =>
   if (!Array.isArray(siteIds) || siteIds.length === 0) {
     throw new HttpError(400, 'siteIds must be a non-empty array')
   }
+  if (siteIds.length > 100) {
+    throw new HttpError(400, 'siteIds must contain at most 100 entries')
+  }
   const parsedStatus = parseSiteStatusBody({ status })
   const results = []
   for (const id of siteIds) {

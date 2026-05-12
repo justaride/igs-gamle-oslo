@@ -22,6 +22,9 @@ type Store = {
   setEditingGeometry: (v: boolean) => void
   editMode: EditMode
   setEditMode: (mode: EditMode) => void
+  saveAndExitRequested: boolean
+  requestSaveAndExit: () => void
+  clearSaveAndExitRequest: () => void
   creatingNewSite: boolean
   setCreatingNewSite: (v: boolean) => void
   pendingGeometry: GeoJSON.MultiPolygon | null
@@ -48,9 +51,12 @@ export const useStore = create<Store>((set) => ({
   toggleLayer: (layer) =>
     set((s) => ({ layers: { ...s.layers, [layer]: !s.layers[layer] } })),
   editingGeometry: false,
-  setEditingGeometry: (v) => set({ editingGeometry: v }),
+  setEditingGeometry: (v) => set({ editingGeometry: v, saveAndExitRequested: false }),
   editMode: 'reshape',
   setEditMode: (mode) => set({ editMode: mode }),
+  saveAndExitRequested: false,
+  requestSaveAndExit: () => set({ saveAndExitRequested: true }),
+  clearSaveAndExitRequest: () => set({ saveAndExitRequested: false }),
   creatingNewSite: false,
   setCreatingNewSite: (v) => set({ creatingNewSite: v, selectedSiteId: null, editingGeometry: false, pendingGeometry: null }),
   pendingGeometry: null,

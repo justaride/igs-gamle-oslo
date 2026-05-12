@@ -1,6 +1,7 @@
 import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
+import rateLimit from 'express-rate-limit'
 import { buildCorsOptions } from './auth.js'
 import { errorHandler, notFoundHandler } from './http.js'
 import { runMigrations } from './migrations.js'
@@ -15,12 +16,28 @@ const app = express()
 const PORT = process.env.PORT || 3001
 const corsOptions = buildCorsOptions()
 
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later' },
+})
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many authentication attempts, please try again later' },
+})
+
 app.disable('x-powered-by')
 app.use(helmet())
-if (corsOptions) {
-  app.use(cors(corsOptions))
-}
+app.use(cors(corsOptions))
 app.use(express.json({ limit: '10mb' }))
+app.use('/api/', apiLimiter)
+app.use('/api/auth', authLimiter)
 
 app.use('/api/sites', sitesRouter)
 app.use('/api/species', speciesRouter)

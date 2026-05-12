@@ -52,7 +52,11 @@ export default function Map() {
   const onEachSite = (feature: GeoJSON.Feature, layer: Layer) => {
     const props = (feature as SiteFeature).properties
     layer.on({
-      click: () => selectSite(props.id),
+      click: () => {
+        const state = useStore.getState()
+        if (state.editingGeometry || state.creatingNewSite) return
+        selectSite(props.id)
+      },
     })
     if ('bindTooltip' in layer) {
       (layer as L.Path).bindTooltip(
