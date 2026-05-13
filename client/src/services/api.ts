@@ -1,5 +1,6 @@
 const BASE = '/api'
 const EDITOR_TOKEN_STORAGE_KEY = 'igs-editor-token'
+const EDITOR_NAME_STORAGE_KEY = 'igs-editor-name'
 
 function getEditorToken() {
   if (typeof window === 'undefined') {
@@ -7,6 +8,14 @@ function getEditorToken() {
   }
 
   return window.localStorage.getItem(EDITOR_TOKEN_STORAGE_KEY)?.trim() ?? ''
+}
+
+function getEditorName() {
+  if (typeof window === 'undefined') {
+    return ''
+  }
+
+  return window.localStorage.getItem(EDITOR_NAME_STORAGE_KEY)?.trim() ?? ''
 }
 
 function buildHeaders(options?: RequestInit, requireEditorToken = false) {
@@ -20,6 +29,10 @@ function buildHeaders(options?: RequestInit, requireEditorToken = false) {
     const token = getEditorToken()
     if (token) {
       headers.set('x-editor-token', token)
+    }
+    const name = getEditorName()
+    if (name) {
+      headers.set('x-editor-name', name)
     }
   }
 
@@ -159,6 +172,20 @@ export const api = {
   clearEditorToken: () => {
     if (typeof window !== 'undefined') {
       window.localStorage.removeItem(EDITOR_TOKEN_STORAGE_KEY)
+      window.localStorage.removeItem(EDITOR_NAME_STORAGE_KEY)
+    }
+  },
+
+  getEditorName,
+
+  setEditorName: (name: string) => {
+    if (typeof window !== 'undefined') {
+      const trimmed = name.trim().slice(0, 60)
+      if (trimmed) {
+        window.localStorage.setItem(EDITOR_NAME_STORAGE_KEY, trimmed)
+      } else {
+        window.localStorage.removeItem(EDITOR_NAME_STORAGE_KEY)
+      }
     }
   },
 }

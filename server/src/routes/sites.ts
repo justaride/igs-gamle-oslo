@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { requireEditorToken } from '../auth.js'
+import { extractEditorName, requireEditorToken } from '../auth.js'
 import { asyncHandler, HttpError } from '../http.js'
 import * as siteService from '../services/siteService.js'
 import { getChangeHistory } from '../services/auditService.js'
@@ -21,7 +21,7 @@ router.get('/', asyncHandler(async (_req, res) => {
 
 router.post('/', requireEditorToken, asyncHandler(async (req, res) => {
   const fields = parseSiteCreateBody(req.body)
-  const feature = await siteService.createSite(fields)
+  const feature = await siteService.createSite(fields, extractEditorName(req))
   res.status(201).json(feature)
 }))
 
@@ -49,7 +49,7 @@ router.get('/:id/changes', asyncHandler(async (req, res) => {
 router.patch('/:id', requireEditorToken, asyncHandler(async (req, res) => {
   const id = parseIdParam(req.params.id)
   const fields = parseSiteUpdateBody(req.body)
-  const result = await siteService.updateSite(id, fields)
+  const result = await siteService.updateSite(id, fields, extractEditorName(req))
   if (!result) {
     throw new HttpError(404, 'Site not found')
   }
@@ -59,7 +59,7 @@ router.patch('/:id', requireEditorToken, asyncHandler(async (req, res) => {
 router.patch('/:id/geometry', requireEditorToken, asyncHandler(async (req, res) => {
   const id = parseIdParam(req.params.id)
   const { geometry } = parseGeometryPatchBody(req.body)
-  const result = await siteService.updateSiteGeometry(id, geometry)
+  const result = await siteService.updateSiteGeometry(id, geometry, extractEditorName(req))
   if (!result) {
     throw new HttpError(404, 'Site not found')
   }
@@ -69,7 +69,7 @@ router.patch('/:id/geometry', requireEditorToken, asyncHandler(async (req, res) 
 router.patch('/:id/status', requireEditorToken, asyncHandler(async (req, res) => {
   const id = parseIdParam(req.params.id)
   const status = parseSiteStatusBody(req.body)
-  const result = await siteService.updateSiteStatus(id, status)
+  const result = await siteService.updateSiteStatus(id, status, extractEditorName(req))
   if (!result) {
     throw new HttpError(404, 'Site not found')
   }
@@ -85,10 +85,11 @@ router.post('/bulk-status', requireEditorToken, asyncHandler(async (req, res) =>
     throw new HttpError(400, 'siteIds must contain at most 100 entries')
   }
   const parsedStatus = parseSiteStatusBody({ status })
+  const editorName = extractEditorName(req)
   const results = []
   for (const id of siteIds) {
     const parsed = parseIdParam(String(id), 'siteId')
-    const result = await siteService.updateSiteStatus(parsed, parsedStatus)
+    const result = await siteService.updateSiteStatus(parsed, parsedStatus, editorName)
     if (result) results.push(result)
   }
   res.json({ updated: results.length })
@@ -96,7 +97,7 @@ router.post('/bulk-status', requireEditorToken, asyncHandler(async (req, res) =>
 
 router.post('/:id/reset-overrides', requireEditorToken, asyncHandler(async (req, res) => {
   const id = parseIdParam(req.params.id)
-  const result = await siteService.resetSiteOverrides(id)
+  const result = await siteService.resetSiteOverrides(id, extractEditorName(req))
   if (!result) {
     throw new HttpError(404, 'Site not found')
   }

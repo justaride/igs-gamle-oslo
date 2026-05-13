@@ -1,7 +1,10 @@
 import crypto from 'node:crypto'
-import type { RequestHandler } from 'express'
+import type { Request, RequestHandler } from 'express'
 import type { CorsOptions } from 'cors'
 import { HttpError } from './http.js'
+
+const EDITOR_NAME_MAX_LENGTH = 60
+const EDITOR_NAME_ALLOWED = /^[\p{L}\p{N} ._'-]+$/u
 
 function parseAllowedOrigins() {
   return (process.env.CORS_ALLOWED_ORIGINS ?? '')
@@ -47,10 +50,31 @@ export function buildCorsOptions(): CorsOptions {
   }
 }
 
+export function assertProductionAuthConfigured() {
+  if (process.env.NODE_ENV !== 'production') return
+
+  const token = process.env.EDITOR_API_TOKEN?.trim()
+  if (!token) {
+    throw new Error(
+      'EDITOR_API_TOKEN must be set in production. Refusing to start with an unauthenticated write surface.'
+    )
+  }
+
+  if (token.length < 16) {
+    throw new Error(
+      'EDITOR_API_TOKEN is too short (min 16 characters). Generate a strong random token (e.g. openssl rand -hex 32).'
+    )
+  }
+}
+
 export const requireEditorToken: RequestHandler = (req, _res, next) => {
   const expectedToken = process.env.EDITOR_API_TOKEN?.trim()
 
   if (!expectedToken) {
+    if (process.env.NODE_ENV === 'production') {
+      next(new HttpError(500, 'Server auth is misconfigured'))
+      return
+    }
     next()
     return
   }
@@ -67,4 +91,16 @@ export const requireEditorToken: RequestHandler = (req, _res, next) => {
   }
 
   next()
+}
+
+export function extractEditorName(req: Request): string {
+  const raw = req.header('x-editor-name')
+  if (typeof raw !== 'string') return 'editor'
+
+  const trimmed = raw.trim()
+  if (!trimmed) return 'editor'
+
+  if (!EDITOR_NAME_ALLOWED.test(trimmed)) return 'editor'
+
+  return trimmed.slice(0, EDITOR_NAME_MAX_LENGTH)
 }

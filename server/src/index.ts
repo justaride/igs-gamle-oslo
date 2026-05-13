@@ -2,7 +2,8 @@ import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
-import { buildCorsOptions } from './auth.js'
+import { assertProductionAuthConfigured, buildCorsOptions } from './auth.js'
+import { query } from './db.js'
 import { errorHandler, notFoundHandler } from './http.js'
 import { runMigrations } from './migrations.js'
 import sitesRouter from './routes/sites.js'
@@ -46,18 +47,25 @@ app.use('/api/context-layers', contextLayersRouter)
 app.use('/api/export', exportRouter)
 app.use('/api/auth', authRouter)
 
-app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok' })
+app.get('/api/health', async (_req, res) => {
+  try {
+    await query('SELECT 1')
+    res.json({ status: 'ok', db: 'ok' })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'unknown error'
+    res.status(503).json({ status: 'degraded', db: 'unreachable', error: message })
+  }
 })
 
 app.use(notFoundHandler)
 app.use(errorHandler)
 
 async function start() {
+  assertProductionAuthConfigured()
   await runMigrations()
 
   app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`)
+    console.log(`Server running on port ${PORT} (env=${process.env.NODE_ENV ?? 'development'})`)
   })
 }
 
@@ -65,3 +73,10 @@ start().catch((error) => {
   console.error('Failed to start server', error)
   process.exit(1)
 })
+
+const shutdown = (signal: string) => {
+  console.log(`Received ${signal}, shutting down gracefully`)
+  process.exit(0)
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'))
+process.on('SIGINT', () => shutdown('SIGINT'))

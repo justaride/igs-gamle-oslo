@@ -67,7 +67,10 @@ export default function ChangeHistory({ siteId }: { siteId: number }) {
               <span className="change-values">
                 {c.oldValue ?? '–'} → {c.newValue ?? '–'}
               </span>
-              <span className="change-meta">{formatDate(c.changedAt)}</span>
+              <span className="change-meta">
+                {formatDate(c.changedAt)}
+                {c.changedBy && c.changedBy !== 'editor' && ` · ${c.changedBy}`}
+              </span>
             </div>
           ))}
         </div>

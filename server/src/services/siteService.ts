@@ -517,7 +517,7 @@ async function refreshReviewQueueCacheForSite(id: number, reason = 'site_updated
   }
 }
 
-export async function createSite(fields: Record<string, unknown>) {
+export async function createSite(fields: Record<string, unknown>, editorName = 'editor') {
   const geometry = fields.geometry as { type: string; coordinates: unknown[] }
   const geojsonStr = JSON.stringify(geometry)
 
@@ -589,6 +589,17 @@ export async function createSite(fields: Record<string, unknown>) {
   }
 
   const newId = result.rows[0].id
+  await recordChanges(
+    newId,
+    {},
+    {
+      created: 'manual_site',
+      igs_type: fields.igs_type ?? null,
+      subtype: fields.subtype ?? null,
+      name: fields.name ?? null,
+    },
+    editorName
+  )
   await refreshReviewQueueCacheForSite(newId, 'site_created')
   return getSiteById(newId)
 }
@@ -617,7 +628,7 @@ export async function getSiteById(id: number) {
   return result.rows[0]?.feature ?? null
 }
 
-export async function updateSite(id: number, fields: Record<string, unknown>) {
+export async function updateSite(id: number, fields: Record<string, unknown>, editorName = 'editor') {
   const columnMap: Record<string, string> = {
     name: 'manual_name',
     ownership: 'manual_ownership',
@@ -682,14 +693,14 @@ export async function updateSite(id: number, fields: Record<string, unknown>) {
         auditNew[key] = fields[key]
       }
     }
-    await recordChanges(id, auditOld, auditNew)
+    await recordChanges(id, auditOld, auditNew, editorName)
     await refreshReviewQueueCacheForSite(id, 'site_updated')
   }
 
   return result.rows[0]
 }
 
-export async function updateSiteGeometry(id: number, geojson: object) {
+export async function updateSiteGeometry(id: number, geojson: object, editorName = 'editor') {
   let result
   try {
     result = await query(
@@ -709,14 +720,14 @@ export async function updateSiteGeometry(id: number, geojson: object) {
   }
 
   if (result.rows[0]) {
-    await recordChanges(id, {}, { geometry: 'oppdatert' })
+    await recordChanges(id, {}, { geometry: 'oppdatert' }, editorName)
     await refreshReviewQueueCacheForSite(id, 'site_geometry_updated')
   }
 
   return result.rows[0]
 }
 
-export async function updateSiteStatus(id: number, status: string) {
+export async function updateSiteStatus(id: number, status: string, editorName = 'editor') {
   const oldResult = await query(`SELECT manual_status, status FROM sites WHERE id = $1`, [id])
   const oldStatus = oldResult.rows[0]?.manual_status ?? oldResult.rows[0]?.status
 
@@ -734,14 +745,14 @@ export async function updateSiteStatus(id: number, status: string) {
   )
 
   if (result.rows[0]) {
-    await recordChanges(id, { status: oldStatus }, { status })
+    await recordChanges(id, { status: oldStatus }, { status }, editorName)
     await refreshReviewQueueCacheForSite(id, 'site_status_updated')
   }
 
   return result.rows[0]
 }
 
-export async function resetSiteOverrides(id: number) {
+export async function resetSiteOverrides(id: number, editorName = 'editor') {
   const result = await query(
     `UPDATE sites
      SET manual_geometry = NULL,
@@ -775,6 +786,7 @@ export async function resetSiteOverrides(id: number) {
   )
 
   if (result.rows[0]) {
+    await recordChanges(id, {}, { overrides: 'reset' }, editorName)
     await refreshReviewQueueCacheForSite(id, 'site_overrides_reset')
   }
 

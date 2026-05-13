@@ -7,6 +7,7 @@ type Props = {
 }
 
 export default function LoginDialog({ onClose, onSuccess }: Props) {
+  const [name, setName] = useState(() => api.getEditorName())
   const [token, setToken] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -19,6 +20,7 @@ export default function LoginDialog({ onClose, onSuccess }: Props) {
     setError('')
 
     api.setEditorToken(token)
+    api.setEditorName(name)
     const valid = await api.verifyToken()
 
     if (valid) {
@@ -36,6 +38,17 @@ export default function LoginDialog({ onClose, onSuccess }: Props) {
       <div className="login-dialog" onClick={(e) => e.stopPropagation()}>
         <h3>Logg inn som redaktør</h3>
         <form onSubmit={handleSubmit}>
+          <label htmlFor="editor-name">Navn (vises i endringshistorikken)</label>
+          <input
+            id="editor-name"
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="f.eks. Kim"
+            autoFocus
+            disabled={loading}
+            maxLength={60}
+          />
           <label htmlFor="editor-token">Redaktørnøkkel</label>
           <input
             id="editor-token"
@@ -43,7 +56,6 @@ export default function LoginDialog({ onClose, onSuccess }: Props) {
             value={token}
             onChange={(e) => setToken(e.target.value)}
             placeholder="Skriv inn nøkkel..."
-            autoFocus
             disabled={loading}
           />
           {error && <p className="login-error">{error}</p>}
