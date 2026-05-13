@@ -80,6 +80,15 @@ function AppContent() {
               <small>{route.description}</small>
             </a>
           ))}
+          <a
+            className="dashboard-nav-link dashboard-nav-link-help"
+            href="/brukermanual.html"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <span>Hjelp</span>
+            <small>Brukermanual</small>
+          </a>
         </nav>
       </header>
       <main

@@ -143,6 +143,13 @@ a {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
+.dashboard-nav-link-help {
+  opacity: 0.78;
+}
+.dashboard-nav-link-help:hover {
+  opacity: 1;
+}
+
 .dashboard-page {
   flex: 1;
   min-height: 0;

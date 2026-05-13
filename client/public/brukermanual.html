@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="nb">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Brukermanual — IGS Gamle Oslo</title>
+<style>
+  :root {
+    --bg: #fbfaf6;
+    --paper: #ffffff;
+    --ink: #1b2117;
+    --muted: #5b6256;
+    --line: #e2dfd4;
+    --accent: #2f7a3a;
+    --accent-soft: #e8f1e6;
+    --warn: #b2691f;
+    --warn-soft: #fbf0df;
+    --info: #2a5f8a;
+    --info-soft: #e3eef7;
+    --danger: #a83232;
+    --danger-soft: #f7e1de;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 17px; line-height: 1.6;
+  }
+  .page {
+    max-width: 760px;
+    margin: 40px auto;
+    background: var(--paper);
+    padding: 48px 56px 64px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+  }
+  header.cover {
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 20px;
+    margin-bottom: 28px;
+  }
+  .eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  h1 {
+    font-size: 32px;
+    margin: 8px 0 8px;
+    letter-spacing: -0.01em;
+    line-height: 1.15;
+  }
+  .subtitle {
+    color: var(--muted);
+    font-size: 16px;
+    margin: 0;
+  }
+  h2 {
+    font-size: 22px;
+    margin: 44px 0 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--line);
+  }
+  h3 {
+    font-size: 17px;
+    margin: 24px 0 8px;
+  }
+  p { margin: 0 0 12px; }
+  ul, ol { margin: 0 0 14px; padding-left: 22px; }
+  li { margin-bottom: 6px; }
+
+  .quickstart {
+    background: var(--accent-soft);
+    border: 1px solid #b8d3b2;
+    border-radius: 6px;
+    padding: 24px 28px;
+    margin: 0 0 28px;
+  }
+  .quickstart h2 {
+    margin: 0 0 12px;
+    border-bottom: none;
+    padding-bottom: 0;
+    font-size: 20px;
+    color: #1c5a25;
+  }
+  .quickstart .magic-link {
+    display: block;
+    background: #fff;
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    padding: 14px 18px;
+    text-decoration: none;
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 16px;
+    margin: 12px 0 6px;
+    word-break: break-all;
+  }
+  .quickstart .magic-link:hover { background: #f0f9ee; }
+  .quickstart .note {
+    font-size: 14px;
+    color: var(--muted);
+    margin: 8px 0 0;
+  }
+
+  code, kbd {
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.88em;
+  }
+  code {
+    background: #f1efe7;
+    padding: 1px 6px;
+    border-radius: 3px;
+    color: #4b3a14;
+    word-break: break-all;
+  }
+  kbd {
+    background: var(--ink);
+    color: #f8f7f1;
+    border-radius: 4px;
+    padding: 2px 7px;
+    font-size: 0.82em;
+    font-weight: 600;
+  }
+
+  .callout {
+    border-left: 3px solid var(--info);
+    background: var(--info-soft);
+    padding: 12px 16px;
+    margin: 14px 0 18px;
+    border-radius: 0 4px 4px 0;
+  }
+  .callout.tip { border-color: var(--accent); background: var(--accent-soft); }
+  .callout.warn { border-color: var(--warn); background: var(--warn-soft); }
+  .callout strong.label {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .step-list {
+    counter-reset: step;
+    list-style: none;
+    padding-left: 0;
+  }
+  .step-list > li {
+    position: relative;
+    padding: 8px 0 8px 44px;
+    margin-bottom: 6px;
+  }
+  .step-list > li::before {
+    counter-increment: step;
+    content: counter(step);
+    position: absolute;
+    left: 0; top: 8px;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: var(--ink);
+    color: var(--paper);
+    text-align: center;
+    line-height: 28px;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .btn-demo {
+    display: inline-block;
+    background: var(--ink);
+    color: var(--paper);
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 500;
+    margin: 0 1px;
+  }
+  .btn-demo.green { background: var(--accent); }
+  .btn-demo.red { background: var(--danger); }
+  .btn-demo.gray { background: #fff; color: var(--ink); border: 1px solid var(--ink); }
+
+  .chip {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 3px;
+    font-size: 13px;
+    font-weight: 600;
+    margin: 0 2px;
+  }
+  .chip.cand { background: #fff3cd; color: #6b540b; }
+  .chip.val { background: #d4edda; color: #1c5a25; }
+  .chip.rej { background: #f8d7da; color: #6b1d22; }
+  .chip.type-r { background: #6b4c96; color: #fff; }
+  .chip.type-l { background: #f59e0b; color: #fff; }
+  .chip.type-e { background: #3b82f6; color: #fff; }
+  .chip.type-o { background: #f97316; color: #fff; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 8px 0 18px;
+    font-size: 15px;
+  }
+  th, td {
+    text-align: left;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  th {
+    background: #f5f3ea;
+    font-weight: 600;
+    font-size: 13px;
+  }
+
+  footer.colophon {
+    margin-top: 48px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  @media print {
+    body { background: #fff; }
+    .page { box-shadow: none; border: none; margin: 0; padding: 20px; max-width: 100%; }
+    .quickstart .magic-link { word-break: break-all; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="cover">
+  <div class="eyebrow">Brukermanual · for Kim</div>
+  <h1>IGS Gamle Oslo</h1>
+  <p class="subtitle">Slik bruker du verktøyet til å gå gjennom og rette uformelle grøntområder.</p>
+</header>
+
+<div class="quickstart">
+  <h2>Klikk denne lenken — du er inne</h2>
+  <p>
+    Lenken under tar deg rett inn i verktøyet og logger deg inn automatisk.
+    Du trenger ikke kopiere noe.
+  </p>
+  <a class="magic-link" href="https://igs.naturalstateproject.com/#k=644d09a91cbe7be797ce3996213bc059fd692770e98a4294c8a35b34af5a1c1f&n=Kim">
+    https://igs.naturalstateproject.com/#k=…&n=Kim ↗
+  </a>
+  <p class="note">
+    Lagre lenken som et bokmerke første gang. Etter det husker nettleseren deg.
+    Anbefalt nettleser: Chrome eller Safari (oppdatert).
+  </p>
+</div>
+
+<div class="callout warn">
+  <strong class="label">Sikkerhet</strong>
+  Lenken over er som et passord — den gir tilgang til å endre alt. <strong>Ikke videresend
+  den</strong> til andre. Skal noen <em>se</em> kartet uten å kunne endre, send dem bare
+  hoved-URL-en: <code>https://igs.naturalstateproject.com/</code>.
+</div>
+
+<h2>Den vanligste oppgaven din: gå gjennom områder</h2>
+
+<p>
+  Når du er inne klikker du på <strong>Kart</strong>-fanen øverst. Du ser et kart over Gamle Oslo
+  med fargede områder, et søkefelt, et statusfilter, og et sidepanel til høyre.
+</p>
+
+<ol class="step-list">
+  <li>
+    <strong>Klikk på et område</strong> i kartet. Sidepanelet til høyre fylles ut med detaljer.
+  </li>
+  <li>
+    Vurder om dette faktisk er et uformelt grøntområde slik det er klassifisert.
+  </li>
+  <li>
+    Trykk <span class="btn-demo green">Valider</span> hvis det stemmer,
+    eller <span class="btn-demo red">Avvis</span> hvis det er feilaktig fanget.
+  </li>
+  <li>
+    Gå videre til neste område — enten klikk på et nytt, eller bruk
+    <strong>Revisjonskø</strong>-listen som dukker opp i sidepanelet når du ikke har valgt noe.
+    Den prioriterer områdene som trenger mest oppmerksomhet.
+  </li>
+</ol>
+
+<div class="callout tip">
+  <strong class="label">Tips: gå raskt gjennom mange</strong>
+  Når du har valgt et område kan du trykke <kbd>V</kbd> for å validere, <kbd>R</kbd> for å avvise,
+  og <kbd>N</kbd> for å hoppe til neste. Det går mye fortere enn å klikke.
+</div>
+
+<h2>Endre informasjon om et område</h2>
+
+<p>
+  Velg området. Under <strong>Vurdering</strong> i sidepanelet finner du et skjema. Endre
+  de feltene du vil, og trykk <span class="btn-demo green">Lagre endringer</span> nederst.
+</p>
+
+<table>
+  <tr><th>Felt</th><th>Hva du skriver der</th></tr>
+  <tr><td>IGS-type</td><td>Hovedkategori for området (se forklaring under).</td></tr>
+  <tr><td>Subtype</td><td>Mer presis underkategori. Velg fra listen.</td></tr>
+  <tr><td>Navn</td><td>Lokalt stedsnavn hvis det finnes — ellers la stå tomt.</td></tr>
+  <tr><td>Eierskap</td><td>Offentlig, Privat, eller Ukjent.</td></tr>
+  <tr><td>Tilgangskontroll</td><td>Åpen, Delvis (port/gjerde), eller Lukket.</td></tr>
+  <tr><td>Vedlikehold</td><td>Formelt, Uformelt, eller Ingen.</td></tr>
+  <tr><td>Muligheter / utfordringer</td><td>Hak av det som passer (skjult perle, nærhet til boliger, farlig, støy, for lite).</td></tr>
+  <tr><td>Notater</td><td>Frittekst — alt du vil huske.</td></tr>
+</table>
+
+<div class="callout">
+  <strong class="label">Angre</strong>
+  Vil du angre <em>før</em> du har trykket Lagre, klikk <span class="btn-demo gray">Nullstill utkast</span>.
+  Har du allerede lagret og vil tilbake til hvordan området var, klikk
+  <span class="btn-demo gray">Nullstill manuelle endringer</span> øverst i sidepanelet.
+</div>
+
+<h2>Endre grensa rundt et område</h2>
+
+<ol class="step-list">
+  <li>Velg området.</li>
+  <li>
+    Klikk <span class="btn-demo">Rediger grense</span> for å flytte på hjørnene,
+    eller <span class="btn-demo gray">Tegn ny polygon</span> for å starte på nytt.
+  </li>
+  <li>
+    Dra hjørnene dit du vil ha dem (eller klikk for å sette nye hjørner ved tegning;
+    dobbeltklikk for å avslutte).
+  </li>
+  <li>
+    Trykk <span class="btn-demo">Avslutt redigering</span> — eller bare <kbd>Esc</kbd>.
+    <strong>Endringene lagres automatisk</strong> når du avslutter.
+  </li>
+</ol>
+
+<div class="callout warn">
+  <strong class="label">Husk</strong>
+  Det er ingen «Lagre»-knapp under redigering — endringen lagres når du avslutter. Lukker du
+  nettleseren midt i, advarer den deg først.
+</div>
+
+<h2>Legge til et nytt område</h2>
+
+<ol class="step-list">
+  <li>Sørg for at ingen område er valgt. (Trykk <kbd>Esc</kbd> hvis du må.)</li>
+  <li>Klikk <span class="btn-demo">Nytt område</span> øverst.</li>
+  <li>Tegn omrisset i kartet — klikk for hvert hjørne, dobbeltklikk for å avslutte.</li>
+  <li>Velg IGS-type i skjemaet, fyll inn navn og notater hvis du vil.</li>
+  <li>Klikk <span class="btn-demo green">Opprett område</span>.</li>
+</ol>
+
+<h2>Registrere en artsobservasjon</h2>
+
+<p>
+  Velg et område. Lenger ned i sidepanelet ser du <strong>Arter</strong>. Klikk
+  <span class="btn-demo gray">Legg til observasjon</span>, fyll inn vitenskapelig navn
+  (obligatorisk) og eventuelt norsk navn og antall, klikk <span class="btn-demo green">Registrer</span>.
+</p>
+
+<h2>Eksportere data</h2>
+
+<p>
+  Øverst på Kart-siden finner du to knapper:
+  <span class="btn-demo gray">Excel</span> og <span class="btn-demo gray">GeoJSON</span>.
+  Klikk for å laste ned. Filen inneholder de områdene som er synlige med det statusfilteret du har
+  satt — sett filteret til <em>Alle</em> hvis du vil ha alt.
+</p>
+
+<h2>Hva betyr fargene og statusene?</h2>
+
+<h3>Fargene på områdene</h3>
+<p>
+  <span class="chip type-r">Residual</span> Restarealer mellom bygg og infrastruktur (vei, jernbane).<br>
+  <span class="chip type-l">Lot</span> Ledige tomter og brakkmark.<br>
+  <span class="chip type-e">Edgeland</span> Kantsoner — vanligvis langs vann.<br>
+  <span class="chip type-o">Opportunity</span> Areal med utviklingspotensial.
+</p>
+
+<h3>Statusene</h3>
+<p>
+  <span class="chip cand">Kandidat</span> Foreslått av systemet, ikke vurdert ennå.<br>
+  <span class="chip val">Validert</span> Du har bekreftet at klassifiseringen stemmer.<br>
+  <span class="chip rej">Avvist</span> Ikke et reelt IGS-område — filtreres ut av eksport.
+</p>
+
+<h3>«God mulighet»-merket</h3>
+<p>
+  Et område får merket <em>God mulighet</em> automatisk når det er offentlig (eller ukjent eierskap),
+  har åpen eller delvis tilgang, og ikke er merket som farlig, støyfullt eller for lite.
+  Du kan overstyre flagget manuelt fra skjemaet.
+</p>
+
+<h2>Hvis noe ikke fungerer</h2>
+
+<table>
+  <tr><th>Hva du ser</th><th>Hva du gjør</th></tr>
+  <tr>
+    <td>Ingen knapper for å endre — bare en «Logg inn»-knapp.</td>
+    <td>Lenken har mistet tokenet. Åpne magisk-lenken fra e-posten på nytt, eller klikk «Logg inn» og lim inn nøkkelen manuelt (se under).</td>
+  </tr>
+  <tr>
+    <td>«Ugyldig redaktørnøkkel».</td>
+    <td>Sjekk at det ikke er mellomrom foran eller bak nøkkelen. Lim inn på nytt.</td>
+  </tr>
+  <tr>
+    <td>Endringen min ble ikke lagret.</td>
+    <td>Sjekk om det står «Lagring feilet» nederst på skjermen. Prøv én gang til. Hvis det fortsetter — ta skjermdump og send Gabriel.</td>
+  </tr>
+  <tr>
+    <td>Jeg redigerte grensa, men endringen forsvant.</td>
+    <td>Du må trykke «Avslutt redigering» (eller Esc) for at det skal lagre. Lukker du fanen midt i, går det tapt.</td>
+  </tr>
+  <tr>
+    <td>Eksporten min mangler de fleste områdene.</td>
+    <td>Statusfilteret er satt til noe annet enn «Alle». Endre det og prøv igjen.</td>
+  </tr>
+  <tr>
+    <td>«For mange forespørsler».</td>
+    <td>Vent et par minutter og prøv igjen.</td>
+  </tr>
+</table>
+
+<h3>Manuell innlogging (hvis magisk-lenken ikke virker)</h3>
+<p>
+  Hvis du må logge inn manuelt en gang:
+</p>
+<ol>
+  <li>Gå til <code>https://igs.naturalstateproject.com/</code>.</li>
+  <li>Klikk «Kart» øverst, så «Logg inn» til høyre.</li>
+  <li>Skriv inn navnet ditt (f.eks. «Kim»).</li>
+  <li>Lim inn redaktørnøkkelen: <br>
+    <code>644d09a91cbe7be797ce3996213bc059fd692770e98a4294c8a35b34af5a1c1f</code>
+  </li>
+  <li>Klikk «Logg inn».</li>
+</ol>
+
+<div class="callout">
+  <strong class="label">Hjelp</strong>
+  Står du fast? Ta en skjermdump (<kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>4</kbd> på Mac,
+  <kbd>Win</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> på Windows) og send til Gabriel sammen med en kort
+  beskrivelse av hva du prøvde å gjøre.
+</div>
+
+<footer class="colophon">
+  Brukermanual for IGS Gamle Oslo. Sist oppdatert mai 2026.
+  Denne manualen følger med selve verktøyet — du finner den alltid bak <strong>Hjelp</strong>-knappen
+  øverst.
+</footer>
+
+</div>
+</body>
+</html>
