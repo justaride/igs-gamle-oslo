@@ -1,13 +1,14 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { type MouseEvent, useEffect } from 'react'
+import { lazy, Suspense, type MouseEvent, useEffect } from 'react'
 import { type AppRoute, useAppRouter } from './hooks/useAppRouter'
 import ErrorBoundary from './components/ErrorBoundary'
 import ToastContainer from './components/Toast'
-import MapPage from './pages/MapPage'
-import MapLabPage from './pages/MapLabPage'
-import OverviewPage from './pages/OverviewPage'
-import TechnicalLogPage from './pages/TechnicalLogPage'
 import './app.css'
+
+const MapPage = lazy(() => import('./pages/MapPage'))
+const MapLabPage = lazy(() => import('./pages/MapLabPage'))
+const OverviewPage = lazy(() => import('./pages/OverviewPage'))
+const TechnicalLogPage = lazy(() => import('./pages/TechnicalLogPage'))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -58,8 +59,22 @@ function AppContent() {
     navigate(path)
   }
 
+  const page = (
+    <>
+      {pathname === '/map' && <MapPage />}
+      {pathname === '/map-lab' && <MapLabPage onOpenMap={() => navigate('/map')} />}
+      {pathname === '/' && (
+        <OverviewPage
+          onOpenMap={() => navigate('/map')}
+          onOpenTechnicalLog={() => navigate('/technical-log')}
+        />
+      )}
+      {pathname === '/technical-log' && <TechnicalLogPage onOpenMap={() => navigate('/map')} />}
+    </>
+  )
+
   return (
-    <div className="dashboard-shell">
+    <div className={`dashboard-shell ${pathname === '/map' ? 'dashboard-shell-map' : ''}`}>
       <header className="dashboard-topbar">
         <div className="dashboard-brand">
           <span className="eyebrow">Informal Green Spaces</span>
@@ -96,15 +111,9 @@ function AppContent() {
           pathname === '/map' ? 'dashboard-page-map' : pathname === '/map-lab' ? 'dashboard-page-lab' : ''
         }`}
       >
-        {pathname === '/map' && <MapPage />}
-        {pathname === '/map-lab' && <MapLabPage onOpenMap={() => navigate('/map')} />}
-        {pathname === '/' && (
-          <OverviewPage
-            onOpenMap={() => navigate('/map')}
-            onOpenTechnicalLog={() => navigate('/technical-log')}
-          />
-        )}
-        {pathname === '/technical-log' && <TechnicalLogPage onOpenMap={() => navigate('/map')} />}
+        <Suspense fallback={<div className="route-loading">Laster arbeidsflate...</div>}>
+          {page}
+        </Suspense>
       </main>
       <footer className="dashboard-footer">
         <span>{currentRoute.label}</span>

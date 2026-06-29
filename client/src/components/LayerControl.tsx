@@ -1,11 +1,15 @@
 import { MAP_LAYER_DETAILS } from '../data/mapMetadata'
 import { useStore } from '../hooks/useStore'
 
-export default function LayerControl() {
+type LayerControlProps = {
+  className?: string
+}
+
+export default function LayerControl({ className = '' }: LayerControlProps) {
   const { layers, toggleLayer } = useStore()
 
   return (
-    <div className="layer-control">
+    <div className={`layer-control ${className}`.trim()}>
       <h4>Kartlag</h4>
       {MAP_LAYER_DETAILS.map(({ layerKey, label, color }) => (
         <label key={layerKey} className="layer-item">

@@ -69,9 +69,12 @@ export default function SiteSearch() {
   return (
     <div className="site-search" ref={containerRef}>
       <input
+        id="site-search"
+        name="site-search"
         type="text"
         className="search-input"
         placeholder="Sok etter site..."
+        aria-label="Sok etter site"
         value={query}
         onChange={(e) => handleChange(e.target.value)}
         onFocus={() => results.length > 0 && setOpen(true)}

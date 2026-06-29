@@ -162,6 +162,14 @@ a {
   min-height: 0;
 }
 
+.route-loading {
+  width: 100%;
+  min-height: 240px;
+  display: grid;
+  place-items: center;
+  color: var(--text-dim);
+}
+
 .dashboard-page-lab {
   min-height: 0;
   padding: 18px;
@@ -1125,6 +1133,10 @@ a {
   bottom: 30px;
 }
 
+.map-control-toggle {
+  display: none;
+}
+
 .map-lab-page {
   width: 100%;
   flex: 1;
@@ -1879,6 +1891,135 @@ a {
   .layer-control,
   .legend {
     max-width: calc(100% - 20px);
+  }
+
+  .dashboard-shell-map .dashboard-topbar {
+    position: static;
+    gap: 12px;
+    padding: 12px 14px;
+  }
+
+  .dashboard-shell-map .dashboard-brand {
+    max-width: none;
+    gap: 2px;
+  }
+
+  .dashboard-shell-map .dashboard-brand h1 {
+    font-size: 24px;
+    letter-spacing: 0;
+  }
+
+  .dashboard-shell-map .dashboard-brand p {
+    display: none;
+  }
+
+  .dashboard-shell-map .dashboard-nav {
+    display: flex;
+    grid-template-columns: none;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .dashboard-shell-map .dashboard-nav-link {
+    flex: 0 0 auto;
+    min-height: 44px;
+    padding: 9px 12px;
+    border-radius: 10px;
+  }
+
+  .dashboard-shell-map .dashboard-nav-link small {
+    display: none;
+  }
+
+  .dashboard-shell-map .dashboard-page-map {
+    padding: 0;
+  }
+
+  .dashboard-shell-map,
+  .dashboard-shell-map .app {
+    width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
+  }
+
+  .dashboard-shell-map .app-header {
+    width: 100%;
+    min-width: 0;
+    padding: 14px;
+  }
+
+  .dashboard-shell-map .app-body {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .dashboard-shell-map .subtitle {
+    display: none;
+  }
+
+  .dashboard-shell-map .status-pills,
+  .dashboard-shell-map .header-actions {
+    flex-wrap: nowrap;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .dashboard-shell-map .map-container {
+    min-height: 62svh;
+  }
+
+  .dashboard-shell-map .sidebar {
+    max-height: 46svh;
+  }
+
+  .map-control-toggle {
+    position: absolute;
+    top: 10px;
+    left: 54px;
+    z-index: 1100;
+    display: flex;
+    gap: 6px;
+  }
+
+  .map-control-toggle button {
+    min-height: 34px;
+    padding: 7px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 999px;
+    background: rgba(23, 29, 26, 0.92);
+    color: var(--text);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+  }
+
+  .map-control-toggle button[aria-pressed='true'] {
+    border-color: var(--accent);
+    background: rgba(97, 177, 255, 0.2);
+  }
+
+  .map-container .layer-control,
+  .map-container .legend {
+    display: none;
+  }
+
+  .map-container .layer-control.map-panel-open,
+  .map-container .legend.map-panel-open {
+    display: block;
+  }
+
+  .map-container .layer-control {
+    top: 54px;
+    right: 10px;
+    left: 10px;
+    min-width: 0;
+  }
+
+  .map-container .legend {
+    right: 10px;
+    bottom: 10px;
   }
 
   .map-lab-overlay {

@@ -54,6 +54,7 @@ function QueueItem({ item, isActive, onSelect, checked, onToggle }: {
     <div className={`review-queue-item ${isActive ? 'review-queue-item-active' : ''}`}>
       <input
         type="checkbox"
+        aria-label={`Velg ${item.siteNumber} i revisjonskoen`}
         checked={checked}
         onChange={onToggle}
         className="review-queue-checkbox"

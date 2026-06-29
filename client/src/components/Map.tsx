@@ -1,12 +1,12 @@
-import { useEffect, useRef } from 'react'
-import { MapContainer, TileLayer, GeoJSON, CircleMarker, Tooltip, useMap } from 'react-leaflet'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import { useStore } from '../hooks/useStore'
 import { useParks } from '../hooks/useParks'
 import { useSites } from '../hooks/useSites'
 import { useSpecies } from '../hooks/useSpecies'
 import { IGS_COLORS, RED_LIST_CATEGORIES } from '../types'
-import type { SiteCollection, SiteFeature, IgsType } from '../types'
+import type { SiteCollection, SiteFeature, SpeciesCollection, SpeciesFeature, IgsType } from '../types'
 import type { GeoJSON as LeafletGeoJson, Layer } from 'leaflet'
 import LayerControl from './LayerControl'
 import Legend from './Legend'
@@ -40,12 +40,60 @@ function FlyToHandler() {
   return null
 }
 
+function getSpeciesStyle(props: SpeciesFeature['properties']) {
+  const isAlien = props.is_alien
+  const isRedListed = props.red_list_category
+    ? RED_LIST_CATEGORIES.includes(props.red_list_category)
+    : false
+
+  return {
+    color: isAlien ? '#ff8800' : isRedListed ? '#ff0000' : '#666',
+    fillColor: isAlien ? '#ff8800' : isRedListed ? '#ff0000' : '#999',
+    fillOpacity: 0.8,
+    weight: 1,
+    radius: 5,
+  }
+}
+
+function getSpeciesTooltip(props: SpeciesFeature['properties']) {
+  const name = props.vernacular_name || props.scientific_name
+  const redList = props.red_list_category ? ` (${props.red_list_category})` : ''
+  const alien = props.is_alien ? ' — Fremmed art' : ''
+  return `${name}${redList}${alien}`
+}
+
+function SpeciesLayer({ species }: { species: SpeciesCollection }) {
+  const map = useMap()
+  const renderer = useMemo(() => L.canvas({ padding: 0.5 }), [])
+
+  useEffect(() => {
+    const layer = L.geoJSON(species as GeoJSON.GeoJsonObject, {
+      pointToLayer: (feature, latlng) => {
+        const props = (feature as SpeciesFeature).properties
+        return L.circleMarker(latlng, {
+          ...getSpeciesStyle(props),
+          renderer,
+        }).bindTooltip(getSpeciesTooltip(props))
+      },
+    })
+
+    layer.addTo(map)
+    return () => {
+      layer.removeFrom(map)
+    }
+  }, [map, renderer, species])
+
+  return null
+}
+
 export default function Map() {
   const { layers, selectSite, selectedSiteId, editingGeometry, editMode, statusFilter } = useStore()
   const { data: sites } = useSites()
-  const { data: species } = useSpecies()
+  const { data: species } = useSpecies(layers.species)
   const { data: parks } = useParks()
   const siteLayerRef = useRef<LeafletGeoJson | null>(null)
+  const [showLayerControl, setShowLayerControl] = useState(false)
+  const [showLegend, setShowLegend] = useState(false)
   const hiddenSiteId =
     editingGeometry && editMode === 'reshape' ? selectedSiteId : null
 
@@ -122,6 +170,7 @@ export default function Map() {
     <MapContainer
       center={GAMLE_OSLO_CENTER}
       zoom={14}
+      preferCanvas
       style={{ height: '100%', width: '100%' }}
     >
       <TileLayer
@@ -156,40 +205,34 @@ export default function Map() {
         onEachFeature={onEachSite}
       />
 
-      {layers.species &&
-        species?.features.map((f) => {
-          const isAlien = f.properties.is_alien
-          const isRedListed = f.properties.red_list_category
-            ? RED_LIST_CATEGORIES.includes(f.properties.red_list_category)
-            : false
-          return (
-            <CircleMarker
-              key={f.properties.id}
-              center={[
-                f.geometry.coordinates[1],
-                f.geometry.coordinates[0],
-              ]}
-              radius={5}
-              pathOptions={{
-                color: isAlien ? '#ff8800' : isRedListed ? '#ff0000' : '#666',
-                fillColor: isAlien ? '#ff8800' : isRedListed ? '#ff0000' : '#999',
-                fillOpacity: 0.8,
-                weight: 1,
-              }}
-            >
-              <Tooltip>
-                {f.properties.vernacular_name || f.properties.scientific_name}
-                {f.properties.red_list_category && ` (${f.properties.red_list_category})`}
-                {isAlien && ' — Fremmed art'}
-              </Tooltip>
-            </CircleMarker>
-          )
-        })}
+      {layers.species && species && <SpeciesLayer species={species} />}
 
       <DrawTools />
       <FlyToHandler />
-      <LayerControl />
-      <Legend />
+      <div className="map-control-toggle" aria-label="Kartkontroller">
+        <button
+          type="button"
+          aria-pressed={showLayerControl}
+          onClick={() => {
+            setShowLayerControl((open) => !open)
+            setShowLegend(false)
+          }}
+        >
+          Kartlag
+        </button>
+        <button
+          type="button"
+          aria-pressed={showLegend}
+          onClick={() => {
+            setShowLegend((open) => !open)
+            setShowLayerControl(false)
+          }}
+        >
+          Forklaring
+        </button>
+      </div>
+      <LayerControl className={showLayerControl ? 'map-panel-open' : ''} />
+      <Legend className={showLegend ? 'map-panel-open' : ''} />
     </MapContainer>
   )
 }

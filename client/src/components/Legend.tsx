@@ -1,8 +1,12 @@
 import { LEGEND_ITEMS } from '../data/mapMetadata'
 
-export default function Legend() {
+type LegendProps = {
+  className?: string
+}
+
+export default function Legend({ className = '' }: LegendProps) {
   return (
-    <div className="legend">
+    <div className={`legend ${className}`.trim()}>
       <h4>Forklaring</h4>
       {LEGEND_ITEMS.map(({ id, label, color, outline, dot }) => (
         <div key={label} className="legend-item">
