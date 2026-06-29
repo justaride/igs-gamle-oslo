@@ -1,10 +1,10 @@
-import ExcelJS from 'exceljs'
 import { query } from '../db.js'
 import { buildSiteSql } from './siteSql.js'
+import { buildXlsxWorkbook, type XlsxCellValue } from './xlsxWriter.js'
 
 const siteSql = buildSiteSql('s')
 
-export async function generateExcel(statusFilter?: string[]): Promise<ExcelJS.Workbook> {
+export async function generateExcel(statusFilter?: string[]): Promise<Buffer> {
   const params: unknown[] = []
   let statusClause = ''
   if (statusFilter && statusFilter.length > 0) {
@@ -42,9 +42,6 @@ export async function generateExcel(statusFilter?: string[]): Promise<ExcelJS.Wo
   `, params)
   const sites = result.rows
 
-  const wb = new ExcelJS.Workbook()
-  const ws = wb.addWorksheet('IGS Assessment')
-
   const fields = [
     { key: 'header', label: 'Field', response: 'Response / Code' },
     { key: 'igs_type', label: 'IGS TYPE (Lot, Edgeland, or Residual)', response: 'Lot / Edgeland / Residual' },
@@ -73,16 +70,17 @@ export async function generateExcel(statusFilter?: string[]): Promise<ExcelJS.Wo
     { key: 'good_opp', label: 'GOOD OPPORTUNITY', response: '' },
   ]
 
-  const headerRow = ['Field', 'Response / Code']
+  const rows: XlsxCellValue[][] = []
+  const headerRow: XlsxCellValue[] = ['Field', 'Response / Code']
   sites.forEach((s: Record<string, unknown>) => headerRow.push(s.site_number as string))
-  ws.addRow(headerRow)
+  rows.push(headerRow)
 
   const boolToYesNo = (v: unknown) => v === true ? 'Yes' : v === false ? 'No' : ''
 
   for (const field of fields.slice(1)) {
-    const row: (string | number | null)[] = [field.label, field.response]
+    const row: XlsxCellValue[] = [field.label, field.response]
     for (const site of sites) {
-      let val: string | number | null = ''
+      let val: XlsxCellValue = ''
       switch (field.key) {
         case 'igs_type': case 'type_auto':
           val = site.igs_type; break
@@ -125,18 +123,17 @@ export async function generateExcel(statusFilter?: string[]): Promise<ExcelJS.Wo
       }
       row.push(val)
     }
-    ws.addRow(row)
+    rows.push(row)
   }
 
-  ws.getColumn(1).width = 60
-  ws.getColumn(2).width = 20
+  const columnWidths = [60, 20]
   for (let i = 3; i <= sites.length + 2; i++) {
-    ws.getColumn(i).width = 15
+    columnWidths.push(15)
   }
 
-  const hdrRow = ws.getRow(1)
-  hdrRow.font = { bold: true }
-  hdrRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } }
-
-  return wb
+  return buildXlsxWorkbook({
+    sheetName: 'IGS Assessment',
+    rows,
+    columnWidths,
+  })
 }

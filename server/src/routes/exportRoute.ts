@@ -16,11 +16,11 @@ function parseStatusFilter(raw: unknown): string[] | undefined {
 
 router.get('/excel', asyncHandler(async (req, res) => {
   const statusFilter = parseStatusFilter(req.query.status)
-  const wb = await generateExcel(statusFilter)
+  const workbook = await generateExcel(statusFilter)
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
   res.setHeader('Content-Disposition', 'attachment; filename=IGS_Assessment_GamleOslo.xlsx')
-  await wb.xlsx.write(res)
-  res.end()
+  res.setHeader('Content-Length', String(workbook.length))
+  res.end(workbook)
 }))
 
 router.get('/geojson', asyncHandler(async (req, res) => {

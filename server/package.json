@@ -5,13 +5,14 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "smoke:xlsx": "node scripts/smoke-test-xlsx-export.mjs"
   },
   "dependencies": {
     "cors": "^2.8.5",
-    "exceljs": "^4.4.0",
     "express": "^4.21.0",
     "express-rate-limit": "^8.5.1",
+    "fflate": "^0.8.3",
     "helmet": "^8.0.0",
     "pg": "^8.13.0"
   },
