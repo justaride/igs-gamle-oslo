@@ -73,4 +73,7 @@ export type SpeciesObservation = {
   is_alien: boolean
   observation_count: number
   geom: unknown
+  source: 'imported' | 'manual'
+  created_by: string | null
+  created_at: string
 }

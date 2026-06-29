@@ -51,6 +51,24 @@ function parseBoolean(value: unknown, fieldName: string) {
   return value
 }
 
+function parsePositiveInteger(value: unknown, fieldName: string) {
+  const parsed = Number(value)
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new HttpError(400, `${fieldName} must be a positive integer`)
+  }
+
+  return parsed
+}
+
+function parseCoordinate(value: unknown, fieldName: string, min: number, max: number) {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
+    throw new HttpError(400, `${fieldName} must be a number between ${min} and ${max}`)
+  }
+
+  return parsed
+}
+
 function parseEnum<T extends readonly string[]>(
   value: unknown,
   fieldName: string,
@@ -121,6 +139,21 @@ export function parseReviewQueueLimit(value: unknown) {
   }
 
   return parsed
+}
+
+export function parseSpeciesCreateBody(body: unknown) {
+  const payload = ensureObject(body, 'Request body must be a JSON object')
+
+  return {
+    siteId: parsePositiveInteger(payload.site_id, 'site_id'),
+    scientificName: parseNonEmptyString(payload.scientific_name, 'scientific_name'),
+    vernacularName: parseNullableString(payload.vernacular_name, 'vernacular_name'),
+    observationCount: payload.observation_count === undefined
+      ? 1
+      : parsePositiveInteger(payload.observation_count, 'observation_count'),
+    latitude: parseCoordinate(payload.latitude, 'latitude', -90, 90),
+    longitude: parseCoordinate(payload.longitude, 'longitude', -180, 180),
+  }
 }
 
 export function parseSiteStatusBody(body: unknown): SiteStatus {

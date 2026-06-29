@@ -9,6 +9,7 @@ import {
   parseGeometryPatchBody,
   parseIdParam,
   parseReviewQueueLimit,
+  parseSpeciesCreateBody,
   parseSiteCreateBody,
   parseSiteStatusBody,
 } from '../dist/validation.js'
@@ -128,6 +129,53 @@ check('parseSiteCreateBody: bad ownership rejected', () =>
     geometry: VALID_POLYGON,
     igs_type: 'Residual',
     ownership: 'invalid',
+  })))
+
+// --- parseSpeciesCreateBody ---
+check('parseSpeciesCreateBody: valid manual observation OK', () =>
+  expectOk(() => parseSpeciesCreateBody({
+    site_id: 42,
+    scientific_name: 'Taraxacum officinale',
+    vernacular_name: 'Løvetann',
+    observation_count: 3,
+    latitude: 59.91,
+    longitude: 10.78,
+  })))
+
+check('parseSpeciesCreateBody: missing scientific name rejected', () =>
+  expect400(() => parseSpeciesCreateBody({
+    site_id: 42,
+    scientific_name: '',
+    observation_count: 1,
+    latitude: 59.91,
+    longitude: 10.78,
+  })))
+
+check('parseSpeciesCreateBody: invalid count rejected', () =>
+  expect400(() => parseSpeciesCreateBody({
+    site_id: 42,
+    scientific_name: 'Taraxacum officinale',
+    observation_count: 0,
+    latitude: 59.91,
+    longitude: 10.78,
+  })))
+
+check('parseSpeciesCreateBody: invalid latitude rejected', () =>
+  expect400(() => parseSpeciesCreateBody({
+    site_id: 42,
+    scientific_name: 'Taraxacum officinale',
+    observation_count: 1,
+    latitude: 120,
+    longitude: 10.78,
+  })))
+
+check('parseSpeciesCreateBody: invalid longitude rejected', () =>
+  expect400(() => parseSpeciesCreateBody({
+    site_id: 42,
+    scientific_name: 'Taraxacum officinale',
+    observation_count: 1,
+    latitude: 59.91,
+    longitude: 220,
   })))
 
 let pass = 0, fail = 0

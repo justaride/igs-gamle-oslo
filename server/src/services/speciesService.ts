@@ -5,6 +5,7 @@ export async function getSpeciesBySite(siteId: number) {
     SELECT
       id, scientific_name, vernacular_name,
       red_list_category, is_alien, observation_count,
+      source, created_by, created_at,
       ST_AsGeoJSON(geom)::json AS geom
     FROM species_observations
     WHERE site_id = $1
@@ -26,15 +27,18 @@ export async function createObservation(data: {
   observationCount: number
   latitude: number
   longitude: number
+  source?: 'imported' | 'manual'
+  createdBy?: string | null
 }) {
   const result = await query(
     `INSERT INTO species_observations (
       site_id, scientific_name, vernacular_name,
-      observation_count, geom
+      observation_count, geom, source, created_by
     ) VALUES (
       $1, $2, $3, $4,
-      ST_SetSRID(ST_MakePoint($5, $6), 4326)
-    ) RETURNING id`,
+      ST_SetSRID(ST_MakePoint($5, $6), 4326),
+      $7, $8
+    ) RETURNING id, source, created_by AS "createdBy", created_at AS "createdAt"`,
     [
       data.siteId,
       data.scientificName,
@@ -42,6 +46,8 @@ export async function createObservation(data: {
       data.observationCount,
       data.longitude,
       data.latitude,
+      data.source ?? 'imported',
+      data.createdBy ?? null,
     ]
   )
   return result.rows[0]
@@ -62,7 +68,10 @@ export async function getAllSpeciesAsGeoJSON() {
             'vernacular_name', so.vernacular_name,
             'red_list_category', so.red_list_category,
             'is_alien', so.is_alien,
-            'observation_count', so.observation_count
+            'observation_count', so.observation_count,
+            'source', so.source,
+            'created_by', so.created_by,
+            'created_at', so.created_at
           )
         )
       ), '[]'::json)

@@ -85,6 +85,9 @@ export type SpeciesProperties = {
   red_list_category: string | null
   is_alien: boolean
   observation_count: number
+  source?: 'imported' | 'manual'
+  created_by?: string | null
+  created_at?: string
 }
 
 export type SpeciesFeature = GeoJSON.Feature<GeoJSON.Point, SpeciesProperties>

@@ -179,6 +179,27 @@ const cases = [
     body: { status: 'maybe' },
     expect: 400,
   },
+  {
+    name: 'species: missing scientific name',
+    method: 'POST',
+    path: '/api/species',
+    body: { site_id: 1, scientific_name: '', observation_count: 1, latitude: 59.91, longitude: 10.78 },
+    expect: 400,
+  },
+  {
+    name: 'species: invalid latitude',
+    method: 'POST',
+    path: '/api/species',
+    body: { site_id: 1, scientific_name: 'Taraxacum officinale', observation_count: 1, latitude: 120, longitude: 10.78 },
+    expect: 400,
+  },
+  {
+    name: 'species: invalid longitude',
+    method: 'POST',
+    path: '/api/species',
+    body: { site_id: 1, scientific_name: 'Taraxacum officinale', observation_count: 1, latitude: 59.91, longitude: 220 },
+    expect: 400,
+  },
 ]
 
 async function runCase(c) {

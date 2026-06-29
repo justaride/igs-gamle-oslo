@@ -157,7 +157,7 @@ export default function SiteSidebar() {
       </div>
 
       <SiteEditForm feature={feature} />
-      <SpeciesPanel siteId={p.id} />
+      <SpeciesPanel siteId={p.id} siteGeometry={feature.geometry} />
       <ChangeHistory siteId={p.id} />
     </div>
   )

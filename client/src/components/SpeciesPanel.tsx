@@ -11,6 +11,9 @@ type SpeciesRow = {
   red_list_category: string | null
   is_alien: boolean
   observation_count: number
+  source?: 'imported' | 'manual'
+  created_by?: string | null
+  created_at?: string
 }
 
 const RED_LIST_COLORS: Record<string, string> = {
@@ -20,7 +23,63 @@ const RED_LIST_COLORS: Record<string, string> = {
   NT: '#ffcc00',
 }
 
-function AddObservationForm({ siteId }: { siteId: number }) {
+type ObservationPoint = {
+  longitude: number
+  latitude: number
+}
+
+function ringArea(ring: GeoJSON.Position[]) {
+  let area = 0
+  for (let i = 0; i < ring.length - 1; i++) {
+    const [x1, y1] = ring[i]
+    const [x2, y2] = ring[i + 1]
+    area += x1 * y2 - x2 * y1
+  }
+  return area / 2
+}
+
+function ringCentroid(ring: GeoJSON.Position[]): ObservationPoint | null {
+  const area = ringArea(ring)
+  if (!Number.isFinite(area) || Math.abs(area) < Number.EPSILON) {
+    return null
+  }
+
+  let cx = 0
+  let cy = 0
+  for (let i = 0; i < ring.length - 1; i++) {
+    const [x1, y1] = ring[i]
+    const [x2, y2] = ring[i + 1]
+    const factor = x1 * y2 - x2 * y1
+    cx += (x1 + x2) * factor
+    cy += (y1 + y2) * factor
+  }
+
+  return {
+    longitude: cx / (6 * area),
+    latitude: cy / (6 * area),
+  }
+}
+
+function getObservationPoint(geometry: GeoJSON.MultiPolygon): ObservationPoint | null {
+  let bestRing: GeoJSON.Position[] | null = null
+  let bestArea = 0
+
+  for (const polygon of geometry.coordinates) {
+    const exteriorRing = polygon[0]
+    if (!exteriorRing) continue
+
+    const area = Math.abs(ringArea(exteriorRing))
+    if (area > bestArea) {
+      bestArea = area
+      bestRing = exteriorRing
+    }
+  }
+
+  if (!bestRing) return null
+  return ringCentroid(bestRing)
+}
+
+function AddObservationForm({ siteId, siteGeometry }: { siteId: number; siteGeometry: GeoJSON.MultiPolygon }) {
   const [open, setOpen] = useState(false)
   const [scientificName, setScientificName] = useState('')
   const [vernacularName, setVernacularName] = useState('')
@@ -53,13 +112,18 @@ function AddObservationForm({ siteId }: { siteId: number }) {
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
     if (!scientificName.trim()) return
+    const point = getObservationPoint(siteGeometry)
+    if (!point) {
+      addToast('Kunne ikke finne punkt for observasjonen', 'error')
+      return
+    }
     create.mutate({
       site_id: siteId,
       scientific_name: scientificName.trim(),
       vernacular_name: vernacularName.trim() || undefined,
       observation_count: Number(count) || 1,
-      latitude: 0,
-      longitude: 0,
+      latitude: point.latitude,
+      longitude: point.longitude,
     })
   }
 
@@ -96,7 +160,13 @@ function AddObservationForm({ siteId }: { siteId: number }) {
   )
 }
 
-export default function SpeciesPanel({ siteId }: { siteId: number }) {
+export default function SpeciesPanel({
+  siteId,
+  siteGeometry,
+}: {
+  siteId: number
+  siteGeometry: GeoJSON.MultiPolygon
+}) {
   const { data: species, isLoading } = useSpeciesBySite(siteId)
 
   if (isLoading) return <div className="species-panel">Laster arter...</div>
@@ -165,7 +235,7 @@ export default function SpeciesPanel({ siteId }: { siteId: number }) {
         </div>
       )}
 
-      {api.hasEditorToken() && <AddObservationForm siteId={siteId} />}
+      {api.hasEditorToken() && <AddObservationForm siteId={siteId} siteGeometry={siteGeometry} />}
     </div>
   )
 }
